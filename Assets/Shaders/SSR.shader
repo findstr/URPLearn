@@ -1,14 +1,16 @@
-Shader "LearnURP/Blinphong"
+Shader "LearnURP/SSR"
 {
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
-        _NormaMap("NormalMap", 2D) = "white" {}
-        _Color("Color", Color) = (1,1,1,1)
+        _GPosition("GPosition", 2D) = "white" {}
+        _GNormal("GNormal", 2D) = "white" {}
+        _GDiffuse("GDiffuse", 2D) = "white" {}
+        _GDepth("GDepth", 2D) = "white" {}
     }
     SubShader
     {
-        Tags {"LightMode" = "GBuffer" "RenderPipeline" = "UniversalRenderPipeline"  "RenderType"="Opaque"}
+        Tags {"RenderPipeline" = "UniversalRenderPipeline"  "RenderType"="Opaque"}
         LOD 100
 
         Pass
@@ -46,8 +48,11 @@ Shader "LearnURP/Blinphong"
             CBUFFER_END
 
             TEXTURE2D(_MainTex);
-            TEXTURE2D(_NormaMap);
-            SAMPLER(sampler_MainTex);
+            TEXTURE2D(_GPosition);
+            TEXTURE2D(_GNormal);
+            TEXTURE2D(_GDiffuse);
+            TEXTURE2D(_GDepth);
+            SAMPLER(sampler_GDiffuse);
 
 
 
@@ -71,7 +76,29 @@ Shader "LearnURP/Blinphong"
 
             half4 frag (v2f i) : SV_Target
             {
-                return _Color;
+            /*
+                float3 worldPos = float3(i.TW1.w, i.TW2.w, i.TW3.w);
+                float4 bump = SAMPLE_TEXTURE2D(_NormaMap, sampler_MainTex, i.uv);
+                float3 normal = UnpackNormal(bump);
+
+                normal = normalize(normal.x * normalize(i.TW1.xyz) + normal.y * normalize(i.TW2.xyz) + normal.z * normalize(i.TW3.xyz));
+
+                Light l = GetMainLight();
+                float3 ldir = l.direction;
+
+                half4 col = SAMPLE_TEXTURE2D(_GDiffuse, sampler_MainTex, i.uv);
+                float3 vdir = normalize(_WorldSpaceCameraPos.xyz - worldPos);
+                float3 hdir = normalize(ldir + vdir);
+
+                float power = saturate(dot(ldir, normal));
+                half3 diff = col.rgb * l.color.rgb * power;
+
+                half3 spec = pow(saturate(dot(hdir, normal)), 128) * 0.1;
+
+                return half4(diff + spec + unity_AmbientSky.rgb * col.rgb, col.a);
+                */
+                //return SAMPLE_TEXTURE2D(_GDiffuse, sampler_GDiffuse, i.uv);
+                return half4(1,0,0,1);
             }
             ENDHLSL
         }

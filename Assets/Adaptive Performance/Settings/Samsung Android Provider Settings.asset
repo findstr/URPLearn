@@ -257,7 +257,7 @@ MonoBehaviour:
       m_MaxBound: 1000
     m_Name: Default Scaler Profile
   m_DefaultScalerProfilerIndex: 0
-  k_AssetVersion: 1
+  k_AssetVersion: 2
   m_SamsungProviderLogging: 0
   m_HighSpeedVRR: 0
   m_AutomaticVRR: 1
