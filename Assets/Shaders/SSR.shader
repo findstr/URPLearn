@@ -5,6 +5,7 @@ Shader "LearnURP/SSR"
         _MainTex ("Texture", 2D) = "white" {}
         _GPosition("GPosition", 2D) = "white" {}
         _GNormal("GNormal", 2D) = "white" {}
+        _GTangent("GTangent", 2D) = "white" {}
         _GDiffuse("GDiffuse", 2D) = "white" {}
         _GDepth("GDepth", 2D) = "white" {}
     }
@@ -97,8 +98,7 @@ Shader "LearnURP/SSR"
 
                 return half4(diff + spec + unity_AmbientSky.rgb * col.rgb, col.a);
                 */
-                //return SAMPLE_TEXTURE2D(_GDiffuse, sampler_GDiffuse, i.uv);
-                return half4(1,0,0,1);
+                return SAMPLE_TEXTURE2D(_GDiffuse, sampler_GDiffuse, i.uv);
             }
             ENDHLSL
         }

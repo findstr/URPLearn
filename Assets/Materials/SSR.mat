@@ -67,6 +67,10 @@ Material:
         m_Texture: {fileID: 8400000, guid: 707f996330d98e54097f3a0fb641eb6b, type: 2}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _GTangent:
+        m_Texture: {fileID: 8400000, guid: 6b993383b4e839f4cb524e899550c808, type: 2}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _METALNESS_MAP:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}

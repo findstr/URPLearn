@@ -16,18 +16,11 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 	private DeferredRenderPipelineAsset asset;
 	private void Resize(RenderTexture rt)
 	{
-		if (rt.width == Screen.width && rt.height == Screen.height)
-			return ;
-		rt.Release();
-		rt.width = Screen.width;
-		rt.height= Screen.height;
-		rt.format= RenderTextureFormat.ARGBHalf;
-		rt.Create();
 	}
 	public DeferredRenderPipelineInstance(DeferredRenderPipelineAsset asset) {
 		this.asset = asset;
 		
-		CameraTarget = new RenderTexture(Screen.width, Screen.height, 0);
+		CameraTarget = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGBHalf);
 		DepthTexture = new RenderTexture(Screen.width, Screen.height, 24, RenderTextureFormat.Depth, RenderTextureReadWrite.Linear);
 		DepthTexture.name = "DepthTexture";
 
@@ -75,6 +68,7 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 
 		//culling
 		foreach (var cam in cameras) {
+			CommandBuffer cb;
 			cam.TryGetCullingParameters(out var cullingPameters);
 			var cullingResults = context.Cull(ref cullingPameters);
 			context.SetupCameraProperties(cam);
@@ -86,14 +80,25 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 			cam.SetTargetBuffers(GBuffers, DepthTexture.depthBuffer);
 
 			context.DrawRenderers(cullingResults, ref drawingSetting, ref filterSetting);
-/*
+			/*
 			if (cam.clearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null)
 				context.DrawSkybox(cam);
-*/
-
+			*/
+			/*
+			cb = new CommandBuffer() {
+				name = "ScreenSpaceReflection",
+			};
+			for (int i = 0; i < GBufferIDs.Length; i++) {
+				Resize(GBufferTextures[i]);
+				asset.MatSSR.SetTexture(GBufferIDs[i], GBufferTextures[i]);
+			}
+			cb.Blit(null, CameraTarget, asset.MatSSR, 0);
+			context.ExecuteCommandBuffer(cb);
+			cb.Release();
+			*/
 			context.Submit();
 
-			//Graphics.Blit(GBufferTextures[0], null as RenderTexture);
 		}
+		Graphics.Blit(asset.GDiffuse, null as RenderTexture);
 	}
 }
