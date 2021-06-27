@@ -67,7 +67,7 @@ Shader "LearnURP/GBuffer"
 
                 o.vertex = TransformObjectToHClip(v.vertex.xyz);
                 o.uv.xy = TRANSFORM_TEX(v.uv, _MainTex).xy;
-                o.uv.z = o.vertex.z;
+                o.uv.z = o.vertex.w;
                 o.TW1 = float4(worldTangent.xyz, worldPos.x);
                 o.TW2 = float4(worldNormal.xyz, worldPos.z);
                 o.TW3 = float4(worldBinormal.xyz, worldPos.y);
@@ -97,17 +97,17 @@ Shader "LearnURP/GBuffer"
                 float3 hdir = normalize(ldir + vdir);
 
                 float power = saturate(dot(ldir, normal));
-                half3 diff = col.rgb * l.color.rgb * power;
+                half3 diff = col.rgb * l.color.rgb;// * power;
 
                 half3 spec = pow(saturate(dot(hdir, normal)), 128) * 0.1;
 
                 half4 diffuse = half4(diff + spec + unity_AmbientSky.rgb * col.rgb, 1);
-                diffuse = half4(0.5,0.5,0.5, 1);
+                diffuse = half4(diff, 1);
 
                 p.GPosition = half4(worldPos, 1.0);
                 p.GNormal = half4(worldNormal, 0.0);
-                p.GDiffuse = col;
-                p.GDepth = i.uv.z;
+                p.GDiffuse = diffuse;
+                p.GDepth = half4(i.uv.z / 255, 0, 0, 1);
                 return p;
             }
             ENDHLSL

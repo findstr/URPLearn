@@ -10,12 +10,19 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 	private RenderTexture[] GBufferTextures;
 	private RenderBuffer[] GBuffers;
 	private int[] GBufferIDs;
+	private int _MainLightPosition;
+	private int _MainLightColor;
 	private ShaderTagId shaderGBuffer;
-	private ShaderTagId shaderSSR;
 	private static int _DepthTexture = Shader.PropertyToID("_DepthTexture");
 	private DeferredRenderPipelineAsset asset;
 	private void Resize(RenderTexture rt)
 	{
+		if (rt.width == Screen.width && rt.height == Screen.height)
+			return ;
+		rt.Release();
+		rt.width = Screen.width;
+		rt.height = Screen.height;
+		rt.Create();
 	}
 	public DeferredRenderPipelineInstance(DeferredRenderPipelineAsset asset) {
 		this.asset = asset;
@@ -48,9 +55,79 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 			GBufferIDs[i] = Shader.PropertyToID(GBufferTextures[i].name);
 		}
 
+		_MainLightColor = Shader.PropertyToID("_MainLightColor");
+		_MainLightPosition = Shader.PropertyToID("_MainLightPosition");
+
 		shaderGBuffer = new ShaderTagId("GBuffer");
-		shaderSSR = new ShaderTagId("SSR");
 	}
+	protected void RenderScene(ScriptableRenderContext ctx, Camera cam) { 
+			cam.TryGetCullingParameters(out var cullingPameters);
+			var cullingResults = ctx.Cull(ref cullingPameters);
+			ctx.SetupCameraProperties(cam);
+			var sortingSettings = new SortingSettings(cam);
+			var filterSetting = FilteringSettings.defaultValue;
+			var drawingSetting = new DrawingSettings(shaderGBuffer, sortingSettings);
+
+			ctx.DrawRenderers(cullingResults, ref drawingSetting, ref filterSetting);
+			
+			if (cam.clearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null)
+				ctx.DrawSkybox(cam);
+			
+			ctx.Submit();
+	}
+
+	protected void RenderGame(ScriptableRenderContext ctx, Camera cam) { 
+			CommandBuffer cb;
+			cam.TryGetCullingParameters(out var cullingPameters);
+			var cullingResults = ctx.Cull(ref cullingPameters);
+			ctx.SetupCameraProperties(cam);
+			var sortingSettings = new SortingSettings(cam);
+			var filterSetting = FilteringSettings.defaultValue;
+			var drawingSetting = new DrawingSettings(shaderGBuffer, sortingSettings);
+
+			cb = new CommandBuffer() {
+				name = "SetLight",
+            };
+
+			Light light = RenderSettings.sun;
+			Shader.SetGlobalVector(_MainLightPosition, -light.transform.forward);
+			Shader.SetGlobalVector(_MainLightColor, light.color.linear);
+			Shader.SetGlobalTexture(_DepthTexture, DepthTexture);
+			for (int i = 0; i < GBufferTextures.Length; i++) { 
+				Resize(GBufferTextures[i]);
+				GBuffers[i] = GBufferTextures[i].colorBuffer;
+			}
+			Resize(CameraTarget);
+			Resize(DepthTexture);
+			cam.SetTargetBuffers(GBuffers, DepthTexture.depthBuffer);
+
+			ctx.DrawRenderers(cullingResults, ref drawingSetting, ref filterSetting);
+			
+			if (cam.clearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null)
+				ctx.DrawSkybox(cam);
+			
+			cb = new CommandBuffer() {
+				name = "ScreenSpaceReflection",
+			};
+			for (int i = 0; i < GBufferIDs.Length; i++) {
+				Resize(GBufferTextures[i]);
+				asset.MatSSR.SetTexture(GBufferIDs[i], GBufferTextures[i]);
+			}
+			cb.Blit(null, CameraTarget, asset.MatSSR, 0);
+			ctx.ExecuteCommandBuffer(cb);
+			cb.Clear();
+
+			cb = new CommandBuffer() {
+				name = "Blit To Screen",
+			};
+			cb.Blit(CameraTarget, null as RenderTexture);
+			ctx.ExecuteCommandBuffer(cb);
+			cb.Release();
+
+	    
+			ctx.Submit();
+	}
+
 	protected override void Render(ScriptableRenderContext context, Camera[] cameras)
 	{
 		//clear screen
@@ -65,40 +142,20 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 		Resize(asset.GNormal);
 		Resize(asset.GDiffuse);
 		Resize(asset.GDepth);
-
 		//culling
 		foreach (var cam in cameras) {
-			CommandBuffer cb;
-			cam.TryGetCullingParameters(out var cullingPameters);
-			var cullingResults = context.Cull(ref cullingPameters);
-			context.SetupCameraProperties(cam);
-			var sortingSettings = new SortingSettings(cam);
-			var filterSetting = FilteringSettings.defaultValue;
-			var drawingSetting = new DrawingSettings(shaderGBuffer, sortingSettings);
-
-			Shader.SetGlobalTexture(_DepthTexture, DepthTexture);
-			cam.SetTargetBuffers(GBuffers, DepthTexture.depthBuffer);
-
-			context.DrawRenderers(cullingResults, ref drawingSetting, ref filterSetting);
-			/*
-			if (cam.clearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null)
-				context.DrawSkybox(cam);
-			*/
-			/*
-			cb = new CommandBuffer() {
-				name = "ScreenSpaceReflection",
-			};
-			for (int i = 0; i < GBufferIDs.Length; i++) {
-				Resize(GBufferTextures[i]);
-				asset.MatSSR.SetTexture(GBufferIDs[i], GBufferTextures[i]);
+			switch (cam.cameraType) { 
+			case CameraType.SceneView:
+				ScriptableRenderContext.EmitWorldGeometryForSceneView(cam);
+				RenderScene(context, cam);
+				break;
+			case CameraType.Game:
+				RenderGame(context, cam);
+				break;
+			default:
+				RenderScene(context, cam);
+				break;
 			}
-			cb.Blit(null, CameraTarget, asset.MatSSR, 0);
-			context.ExecuteCommandBuffer(cb);
-			cb.Release();
-			*/
-			context.Submit();
-
 		}
-		Graphics.Blit(asset.GDiffuse, null as RenderTexture);
 	}
 }

@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: URP2
-  m_Shader: {fileID: 4800000, guid: 7ac9a8417182ca74f87688df702aae37, type: 3}
+  m_Name: Plane
+  m_Shader: {fileID: 4800000, guid: 4b4ad68644902864d8d1d267bb2a1081, type: 3}
   m_ShaderKeywords: 
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -20,7 +20,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 4e171f7a9a43e4ddca6404e4fe4c5067, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -60,7 +60,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: cbaeed03e5416aa4bae23110b63a0c7d, type: 3}
+        m_Texture: {fileID: 2800000, guid: 4e171f7a9a43e4ddca6404e4fe4c5067, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -68,7 +68,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NormaMap:
-        m_Texture: {fileID: 2800000, guid: ad4dcac393f63f3468f6d9ff1652732e, type: 3}
+        m_Texture: {fileID: 2800000, guid: 69a392009c7c02543b3170ba020a4c7e, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _OcclusionMap:
