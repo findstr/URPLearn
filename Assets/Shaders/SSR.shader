@@ -2,6 +2,7 @@ Shader "LearnURP/SSR"
 {
     Properties
     {
+        _CameraPos("CameraPos", Vector) = (0,0,0,0)
         _MainTex ("Texture", 2D) = "white" {}
         _GPosition("GPosition", 2D) = "white" {}
         _GNormal("GNormal", 2D) = "white" {}
@@ -36,16 +37,16 @@ Shader "LearnURP/SSR"
 
             struct v2f
             {
-                float2 uv : TEXCOORD0;
                 float4 vertex : SV_POSITION;
-                float4 TW1: TEXCOORD1;
-                float4 TW2: TEXCOORD2;
-                float4 TW3: TEXCOORD3;
+                float2 uv : TEXCOORD0;
             };
 
             CBUFFER_START(UnityPerMaterial)
             half4 _Color;
+            float4x4 _MatrixVP;
+            float3 _CameraPos;
             float4 _MainTex_ST;
+            float4 _ProjectionArgs;
             CBUFFER_END
 
             TEXTURE2D(_MainTex);
@@ -55,30 +56,88 @@ Shader "LearnURP/SSR"
             TEXTURE2D(_GDepth);
             SAMPLER(sampler_GDiffuse);
 
+	        half2 GetScreenUV(float3 pos) 
+		    {
+                float4 uv = mul(_MatrixVP, float4(pos, 1.0));
+                uv.xy /= uv.w;
+                uv.xy = uv.xy * 0.5 + 0.5;
+                return uv.xy;
+		    } 
+		    float3 GetGBufferPos(half2 uv)
+			{
+                return SAMPLE_TEXTURE2D(_GPosition, sampler_GDiffuse, uv).xyz;
+			}
+		    float GetGBufferDepth(half2 uv)
+		    {
+                float d = SAMPLE_TEXTURE2D(_GDepth, sampler_GDiffuse, uv).x;
+		        return d;
+		    }  
+		    half3 GetGBufferNormal(half2 uv) 
+            {
+                return SAMPLE_TEXTURE2D(_GNormal, sampler_GDiffuse, uv).xyz;
+		    }
+            half3 GetGBufferDiffuse(half2 uv)
+            {
+                return SAMPLE_TEXTURE2D(_GDiffuse, sampler_GDiffuse, uv).xyz;
+	        }
+		    float GetViewDepth(float3 pos) 
+		    {
+                return mul(_MatrixVP, float4(pos, 1.0)).w;
+		    }
 
+		    bool raymarch(float3 ori, float3 dir, out half2 hit, out float x) 
+		    {
+                for (float i = 1; i < 10.0; i += 0.1) {
+                    float3 pos = ori + dir * i;
+                    half2 uv = GetScreenUV(pos);
+                    if (GetViewDepth(pos) > (GetGBufferDepth(uv) + 0.001)) {
+                        hit = uv;
+                        x = GetViewDepth(pos);//GetGBufferDepth(uv);
+                        return true;
+		            }
+		        }
+                return false;
+		    }       
 
             v2f vert (appdata v)
             {
                 v2f o;
 
-                float3 worldNormal = TransformObjectToWorldNormal(v.normal);
-                float3 worldPos = TransformObjectToWorld(v.vertex.xyz);
-                float3 worldTangent = TransformObjectToWorldDir(v.tangent.xyz);
-                float3 worldBinormal = normalize(cross(worldNormal, worldTangent) * v.tangent.w);
-
                 o.vertex = TransformObjectToHClip(v.vertex.xyz);
-                o.uv = TRANSFORM_TEX(v.uv, _MainTex);
-                o.TW1 = float4(worldTangent.xyz, worldPos.x);
-                o.TW2 = float4(worldNormal.xyz, worldPos.z);
-                o.TW3 = float4(worldBinormal.xyz, worldPos.y);
-
+                o.uv.xy = TRANSFORM_TEX(v.uv, _MainTex);
                 return o;
             }
 
             half4 frag (v2f i) : SV_Target
             {
+                float debug = 0.0;
+                float2 hit = float2(0,0);
+                half2 uv = i.uv.xy; //GetScreenUV(float3(i.TW1.w, i.TW2.w, i.TW3.w));
+
+                float3 worldPos = GetGBufferPos(uv);
+                float depth = GetGBufferDepth(uv);
+                //for (float i = 0.1; i < 10.0; i += 0.1) {
+                debug = GetViewDepth(worldPos + half3(0,1,0) * 0.5);
+                depth = GetGBufferDepth(GetScreenUV(float3(worldPos + half3(0,1,0) * 0.5)));
+
+                /*
+                half3 N = GetGBufferNormal(uv);
+                float3 viewDir = normalize(_CameraPos.xyz - worldPos.xyz);
+                half3 reflDir = reflect(-viewDir, N);
+                half3 L = GetGBufferDiffuse(uv);
+                */
+                half3 Lindir = half3(0.0, 0.0, 0.0);
+                /*
+                if (raymarch(worldPos, half3(0,1,0), hit, debug))
+                    Lindir = float3(debug, 0,0); 
+		        */
+                    //Lindir = float3(depth, 0,0); 
+		        if (debug > (depth + 0.001))
+                        Lindir = half3(1,0,0);
+                else
+                        Lindir = half3(0,0,0);
+		        half3 L = abs(Lindir);
             /*
-                float3 worldPos = float3(i.TW1.w, i.TW2.w, i.TW3.w);
                 float4 bump = SAMPLE_TEXTURE2D(_NormaMap, sampler_MainTex, i.uv);
                 float3 normal = UnpackNormal(bump);
 
@@ -97,8 +156,10 @@ Shader "LearnURP/SSR"
                 half3 spec = pow(saturate(dot(hdir, normal)), 128) * 0.1;
 
                 return half4(diff + spec + unity_AmbientSky.rgb * col.rgb, col.a);
-                */
                 return SAMPLE_TEXTURE2D(_GDiffuse, sampler_GDiffuse, i.uv);
+                */
+                //N = TransformWorldToViewDir(N, true);
+                return half4(Lindir, 1.0);
             }
             ENDHLSL
         }

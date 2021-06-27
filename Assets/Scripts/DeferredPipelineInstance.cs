@@ -10,24 +10,29 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 	private RenderTexture[] GBufferTextures;
 	private RenderBuffer[] GBuffers;
 	private int[] GBufferIDs;
+	private int _CameraPos;
+	private int _MatrixVP;
 	private int _MainLightPosition;
 	private int _MainLightColor;
+	private int _ProjectionParams;
 	private ShaderTagId shaderGBuffer;
 	private static int _DepthTexture = Shader.PropertyToID("_DepthTexture");
 	private DeferredRenderPipelineAsset asset;
 	private void Resize(RenderTexture rt)
 	{
+		/*
 		if (rt.width == Screen.width && rt.height == Screen.height)
 			return ;
 		rt.Release();
 		rt.width = Screen.width;
 		rt.height = Screen.height;
 		rt.Create();
+		*/
 	}
 	public DeferredRenderPipelineInstance(DeferredRenderPipelineAsset asset) {
 		this.asset = asset;
 		
-		CameraTarget = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGBHalf);
+		CameraTarget = asset.Target;
 		DepthTexture = new RenderTexture(Screen.width, Screen.height, 24, RenderTextureFormat.Depth, RenderTextureReadWrite.Linear);
 		DepthTexture.name = "DepthTexture";
 
@@ -57,6 +62,9 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 
 		_MainLightColor = Shader.PropertyToID("_MainLightColor");
 		_MainLightPosition = Shader.PropertyToID("_MainLightPosition");
+		_MatrixVP = Shader.PropertyToID("_MatrixVP");
+		_CameraPos = Shader.PropertyToID("_CameraPos");
+		_ProjectionParams = Shader.PropertyToID("_ProjectionArgs");
 
 		shaderGBuffer = new ShaderTagId("GBuffer");
 	}
@@ -101,18 +109,22 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 			Resize(DepthTexture);
 			cam.SetTargetBuffers(GBuffers, DepthTexture.depthBuffer);
 
+			var cmd = new CommandBuffer();
+			cmd.name = "ClearScreen";
+			cmd.ClearRenderTarget(true, true, Color.black);
+			ctx.ExecuteCommandBuffer(cmd);
+			cmd.Release();
+
 			ctx.DrawRenderers(cullingResults, ref drawingSetting, ref filterSetting);
-			
-			if (cam.clearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null)
-				ctx.DrawSkybox(cam);
 			
 			cb = new CommandBuffer() {
 				name = "ScreenSpaceReflection",
 			};
-			for (int i = 0; i < GBufferIDs.Length; i++) {
-				Resize(GBufferTextures[i]);
-				asset.MatSSR.SetTexture(GBufferIDs[i], GBufferTextures[i]);
-			}
+			for (int i = 0; i < GBufferIDs.Length; i++) 
+				asset.MatSSR.SetTexture(GBufferIDs[i], GBufferTextures[i]);	
+			asset.MatSSR.SetVector(_CameraPos, cam.transform.position);
+			asset.MatSSR.SetMatrix(_MatrixVP, cam.projectionMatrix * cam.worldToCameraMatrix);
+			asset.MatSSR.SetVector(_ProjectionParams, new Vector4(0, 0, 0, 1.0f / cam.farClipPlane));
 			cb.Blit(null, CameraTarget, asset.MatSSR, 0);
 			ctx.ExecuteCommandBuffer(cb);
 			cb.Clear();
@@ -130,13 +142,7 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 
 	protected override void Render(ScriptableRenderContext context, Camera[] cameras)
 	{
-		//clear screen
-		var cmd = new CommandBuffer();
-		cmd.name = "ClearScreen";
-		cmd.ClearRenderTarget(true, true, Color.black);
-		context.ExecuteCommandBuffer(cmd);
-		cmd.Release();
-		
+		//clear screen	
 		Resize(CameraTarget);
 		Resize(asset.GPosition);
 		Resize(asset.GNormal);
@@ -145,10 +151,16 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 		//culling
 		foreach (var cam in cameras) {
 			switch (cam.cameraType) { 
-			case CameraType.SceneView:
+			case CameraType.SceneView: { 
 				ScriptableRenderContext.EmitWorldGeometryForSceneView(cam);
+				var cmd = new CommandBuffer();
+				cmd.name = "ClearScreen";
+				cmd.ClearRenderTarget(true, true, Color.black);
+				context.ExecuteCommandBuffer(cmd);
+				cmd.Release();
+		
 				RenderScene(context, cam);
-				break;
+				break; }
 			case CameraType.Game:
 				RenderGame(context, cam);
 				break;

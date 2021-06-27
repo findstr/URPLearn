@@ -10,6 +10,7 @@ public class DeferredRenderPipelineAsset : RenderPipelineAsset
         public RenderTexture GNormal;
         public RenderTexture GDiffuse;
         public RenderTexture GDepth;
+        public RenderTexture Target;
         public Material MatSSR;
         protected override RenderPipeline CreatePipeline() {
                 return new DeferredRenderPipelineInstance(this);

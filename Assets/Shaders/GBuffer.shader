@@ -23,6 +23,8 @@ Shader "LearnURP/GBuffer"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
 
+            #define M_PI 3.1415926535897932384626433832795
+
             struct appdata
             {
                 float4 vertex : POSITION;
@@ -41,10 +43,10 @@ Shader "LearnURP/GBuffer"
             };
 
             struct pixel {
-                half4 GPosition:SV_TARGET0;
+                float4 GPosition:SV_TARGET0;
                 half4 GNormal:SV_TARGET1;
                 half4 GDiffuse:SV_TARGET2;
-                half4 GDepth:SV_TARGET3;
+                float4 GDepth:SV_TARGET3;
             };
 
             CBUFFER_START(UnityPerMaterial)
@@ -68,9 +70,10 @@ Shader "LearnURP/GBuffer"
                 o.vertex = TransformObjectToHClip(v.vertex.xyz);
                 o.uv.xy = TRANSFORM_TEX(v.uv, _MainTex).xy;
                 o.uv.z = o.vertex.w;
+
                 o.TW1 = float4(worldTangent.xyz, worldPos.x);
-                o.TW2 = float4(worldNormal.xyz, worldPos.z);
-                o.TW3 = float4(worldBinormal.xyz, worldPos.y);
+                o.TW2 = float4(worldNormal.xyz, worldPos.y);
+                o.TW3 = float4(worldBinormal.xyz, worldPos.z);
 
                 return o;
             }
@@ -97,17 +100,17 @@ Shader "LearnURP/GBuffer"
                 float3 hdir = normalize(ldir + vdir);
 
                 float power = saturate(dot(ldir, normal));
-                half3 diff = col.rgb * l.color.rgb;// * power;
+                half3 diff = col.rgb * l.color.rgb * power;
 
                 half3 spec = pow(saturate(dot(hdir, normal)), 128) * 0.1;
 
                 half4 diffuse = half4(diff + spec + unity_AmbientSky.rgb * col.rgb, 1);
-                diffuse = half4(diff, 1);
+                diffuse = half4(diff / M_PI, 1);
 
-                p.GPosition = half4(worldPos, 1.0);
+                p.GPosition = float4(worldPos, 1.0);
                 p.GNormal = half4(worldNormal, 0.0);
                 p.GDiffuse = diffuse;
-                p.GDepth = half4(i.uv.z / 255, 0, 0, 1);
+                p.GDepth = float4(i.uv.z, i.uv.z, i.uv.z, 1.0);
                 return p;
             }
             ENDHLSL
