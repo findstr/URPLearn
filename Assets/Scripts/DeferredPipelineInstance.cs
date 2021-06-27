@@ -124,7 +124,7 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 				asset.MatSSR.SetTexture(GBufferIDs[i], GBufferTextures[i]);	
 			asset.MatSSR.SetVector(_CameraPos, cam.transform.position);
 			asset.MatSSR.SetMatrix(_MatrixVP, cam.projectionMatrix * cam.worldToCameraMatrix);
-			asset.MatSSR.SetVector(_ProjectionParams, new Vector4(0, 0, 0, 1.0f / cam.farClipPlane));
+			asset.MatSSR.SetVector(_ProjectionParams, new Vector4(0, 0, 0, cam.farClipPlane));
 			cb.Blit(null, CameraTarget, asset.MatSSR, 0);
 			ctx.ExecuteCommandBuffer(cb);
 			cb.Clear();

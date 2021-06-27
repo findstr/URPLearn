@@ -38,6 +38,7 @@ Shader "LearnURP/SSR"
             struct v2f
             {
                 float4 vertex : SV_POSITION;
+                float3 worldPos: TEXCOORD1;
                 float2 uv : TEXCOORD0;
             };
 
@@ -59,8 +60,7 @@ Shader "LearnURP/SSR"
 	        half2 GetScreenUV(float3 pos) 
 		    {
                 float4 uv = mul(_MatrixVP, float4(pos, 1.0));
-                uv.xy /= uv.w;
-                uv.xy = uv.xy * 0.5 + 0.5;
+                //uv.xy = uv.xy * 0.5 + 0.5;
                 return uv.xy;
 		    } 
 		    float3 GetGBufferPos(half2 uv)
@@ -105,6 +105,7 @@ Shader "LearnURP/SSR"
 
                 o.vertex = TransformObjectToHClip(v.vertex.xyz);
                 o.uv.xy = TRANSFORM_TEX(v.uv, _MainTex);
+                o.worldPos = TransformObjectToWorld(v.vertex.xyz);
                 return o;
             }
 
@@ -112,13 +113,16 @@ Shader "LearnURP/SSR"
             {
                 float debug = 0.0;
                 float2 hit = float2(0,0);
-                half2 uv = i.uv.xy; //GetScreenUV(float3(i.TW1.w, i.TW2.w, i.TW3.w));
+                half2 uv = GetScreenUV(i.worldPos.xyz);
+
+                float2 Guv = SAMPLE_TEXTURE2D(_GDepth, sampler_GDiffuse, i.uv.xy).xy;
 
                 float3 worldPos = GetGBufferPos(uv);
                 float depth = GetGBufferDepth(uv);
                 //for (float i = 0.1; i < 10.0; i += 0.1) {
-                debug = GetViewDepth(worldPos + half3(0,1,0) * 0.5);
-                depth = GetGBufferDepth(GetScreenUV(float3(worldPos + half3(0,1,0) * 0.5)));
+                float2 xy = GetScreenUV(float3(worldPos + half3(0,1,0) * 0.5));
+                debug = GetViewDepth(worldPos + half3(0,1,0) * 0.5) / 100.0;
+                depth = GetGBufferDepth(uv) / 100.0;
 
                 /*
                 half3 N = GetGBufferNormal(uv);
@@ -159,7 +163,8 @@ Shader "LearnURP/SSR"
                 return SAMPLE_TEXTURE2D(_GDiffuse, sampler_GDiffuse, i.uv);
                 */
                 //N = TransformWorldToViewDir(N, true);
-                return half4(Lindir, 1.0);
+                //return half4(i.uv.x, 0, 0, 1.0);
+                return half4(GetGBufferDiffuse(Guv), 1.0);
             }
             ENDHLSL
         }

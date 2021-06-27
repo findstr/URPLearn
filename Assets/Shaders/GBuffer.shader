@@ -107,10 +107,16 @@ Shader "LearnURP/GBuffer"
                 half4 diffuse = half4(diff + spec + unity_AmbientSky.rgb * col.rgb, 1);
                 diffuse = half4(diff / M_PI, 1);
 
+                float4 debug = mul(UNITY_MATRIX_VP, float4(worldPos, 1.0));
+                debug.xy /= debug.w;
+                debug.y *= _ProjectionParams.x;
+                debug.xy = debug.xy * 0.5 + 0.5;
+                i.uv.z = debug.x;
+
                 p.GPosition = float4(worldPos, 1.0);
                 p.GNormal = half4(worldNormal, 0.0);
                 p.GDiffuse = diffuse;
-                p.GDepth = float4(i.uv.z, i.uv.z, i.uv.z, 1.0);
+                p.GDepth = float4(debug.x, debug.y, 0, 0);
                 return p;
             }
             ENDHLSL
