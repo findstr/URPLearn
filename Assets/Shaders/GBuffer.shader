@@ -14,6 +14,7 @@ Shader "LearnURP/GBuffer"
         Pass
         {
             HLSLPROGRAM
+            #pragma enable_d3d11_debug_symbols
             #pragma vertex vert
             #pragma fragment frag
             // make fog work
@@ -111,12 +112,11 @@ Shader "LearnURP/GBuffer"
                 debug.xy /= debug.w;
                 debug.y *= _ProjectionParams.x;
                 debug.xy = debug.xy * 0.5 + 0.5;
-                i.uv.z = debug.x;
 
                 p.GPosition = float4(worldPos, 1.0);
                 p.GNormal = half4(worldNormal, 0.0);
                 p.GDiffuse = diffuse;
-                p.GDepth = float4(debug.x, debug.y, 0, 0);
+                p.GDepth = float4(i.uv.z, i.uv.z, i.uv.z, debug.x + debug.y);
                 return p;
             }
             ENDHLSL
