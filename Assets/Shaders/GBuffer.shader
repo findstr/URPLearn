@@ -73,8 +73,8 @@ Shader "LearnURP/GBuffer"
                 o.uv.z = o.vertex.w;
 
                 o.TW1 = float4(worldTangent.xyz, worldPos.x);
-                o.TW2 = float4(worldNormal.xyz, worldPos.y);
-                o.TW3 = float4(worldBinormal.xyz, worldPos.z);
+                o.TW2 = float4(worldBinormal.xyz, worldPos.y);
+                o.TW3 = float4(worldNormal.xyz, worldPos.z);
 
                 return o;
             }
@@ -84,7 +84,7 @@ Shader "LearnURP/GBuffer"
                 pixel p;
 
                 float3 worldPos = float3(i.TW1.w, i.TW2.w, i.TW3.w);
-                float3 worldNormal = i.TW2.xyz;
+                float3 worldNormal = i.TW3.xyz;
 
                 half4 col = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv.xy);
                 float4 bump = SAMPLE_TEXTURE2D(_NormaMap, sampler_MainTex, i.uv.xy);
@@ -96,27 +96,13 @@ Shader "LearnURP/GBuffer"
                 Light l = GetMainLight();
                 float3 ldir = l.direction;
 
-
-                float3 vdir = normalize(_WorldSpaceCameraPos.xyz - worldPos);
-                float3 hdir = normalize(ldir + vdir);
-
-                float power = saturate(dot(ldir, normal));
-                half3 diff = col.rgb * l.color.rgb * power;
-
-                half3 spec = pow(saturate(dot(hdir, normal)), 128) * 0.1;
-
-                half4 diffuse = half4(diff + spec + unity_AmbientSky.rgb * col.rgb, 1);
-                diffuse = half4(diff / M_PI, 1);
-
-                float4 debug = mul(UNITY_MATRIX_VP, float4(worldPos, 1.0));
-                debug.xy /= debug.w;
-                debug.y *= _ProjectionParams.x;
-                debug.xy = debug.xy * 0.5 + 0.5;
+                half3 albedo = col.rgb * (1 - _Color.a)  + _Color.rgb * _Color.a;
+                half3 diffuse = albedo * l.color.rgb * max(dot(ldir, worldNormal), 0.0) / M_PI;
 
                 p.GPosition = float4(worldPos, 1.0);
                 p.GNormal = half4(worldNormal, 0.0);
-                p.GDiffuse = diffuse;
-                p.GDepth = float4(i.uv.z, i.uv.z, i.uv.z, debug.x + debug.y);
+                p.GDiffuse = half4(diffuse, 1);
+                p.GDepth = float4(i.uv.z, i.uv.z, i.uv.z, 1);
                 return p;
             }
             ENDHLSL

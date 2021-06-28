@@ -16,19 +16,18 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 	private int _MainLightPosition;
 	private int _MainLightColor;
 	private int _ProjectionParams;
+	private int _LightDirection;
 	private ShaderTagId shaderGBuffer;
 	private static int _DepthTexture = Shader.PropertyToID("_DepthTexture");
 	private DeferredRenderPipelineAsset asset;
 	private void Resize(RenderTexture rt)
 	{
-		/*
 		if (rt.width == Screen.width && rt.height == Screen.height)
 			return ;
 		rt.Release();
 		rt.width = Screen.width;
 		rt.height = Screen.height;
 		rt.Create();
-		*/
 	}
 	public DeferredRenderPipelineInstance(DeferredRenderPipelineAsset asset) {
 		this.asset = asset;
@@ -66,7 +65,7 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 		_MatrixVP = Shader.PropertyToID("_MATRIX_VP");
 		_CameraPos = Shader.PropertyToID("_CameraPos");
 		_ProjectionParams = Shader.PropertyToID("_ProjectionArgs");
-
+		_LightDirection = Shader.PropertyToID("_LightDirection");
 		shaderGBuffer = new ShaderTagId("GBuffer");
 	}
 	protected void RenderScene(ScriptableRenderContext ctx, Camera cam) { 
@@ -93,7 +92,6 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 		var filterSetting = FilteringSettings.defaultValue;
 		var drawingSetting = new DrawingSettings(shaderGBuffer, sortingSettings);
 
-		/*
 		Light light = RenderSettings.sun;
 		Shader.SetGlobalVector(_MainLightPosition, -light.transform.forward);
 		Shader.SetGlobalVector(_MainLightColor, light.color.linear);
@@ -104,17 +102,90 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 		}
 		Resize(CameraTarget);
 		Resize(DepthTexture);
-		cam.SetTargetBuffers(GBuffers, DepthTexture.depthBuffer);
+		camera.SetTargetBuffers(GBuffers, DepthTexture.depthBuffer);
 
 		var cmd = new CommandBuffer();
 		cmd.name = "ClearScreen";
 		cmd.ClearRenderTarget(true, true, Color.black);
-		ctx.ExecuteCommandBuffer(cmd);
+		context.ExecuteCommandBuffer(cmd);
 		cmd.Release();
 
-		ctx.DrawRenderers(cullingResults, ref drawingSetting, ref filterSetting);
+		context.DrawRenderers(cullingResults, ref drawingSetting, ref filterSetting);
 		
+		var cb = new CommandBuffer() {
+			name = "ScreenSpaceReflection",
+		};
+		for (int i = 0; i < GBufferIDs.Length; i++) 
+			asset.MatSSR.SetTexture(GBufferIDs[i], GBufferTextures[i]);	
+		asset.MatSSR.SetVector(_CameraPos, camera.transform.position);
+		asset.MatSSR.SetMatrix(_MatrixVP, GL.GetGPUProjectionMatrix(camera.projectionMatrix, true) * camera.worldToCameraMatrix);
+		asset.MatSSR.SetVector(_ProjectionParams, new Vector4(0, 0, 0, camera.farClipPlane));
+		cb.Blit(null, CameraTarget, asset.MatSSR, 0);
+		context.ExecuteCommandBuffer(cb);
+		cb.Clear();
+
 		cb = new CommandBuffer() {
+			name = "Blit To Screen",
+		};
+		cb.Blit(CameraTarget, null as RenderTexture);
+		context.ExecuteCommandBuffer(cb);
+		cb.Release();
+    
+		context.Submit();
+
+		/*
+		// Create the attachment descriptors. If these attachments are not specifically bound to any RenderTexture using the ConfigureTarget calls,
+		// these are treated as temporary surfaces that are discarded at the end of the renderpass
+		var desc_target = new AttachmentDescriptor(RenderTextureFormat.ARGB32);
+		var desc_position = new AttachmentDescriptor(RenderTextureFormat.ARGB32);
+		var desc_normal = new AttachmentDescriptor(RenderTextureFormat.ARGB32);
+		var desc_diffuse = new AttachmentDescriptor(RenderTextureFormat.ARGB32);
+		var desc_depth = new AttachmentDescriptor(RenderTextureFormat.ARGB32);
+		var desc_zdepth = new AttachmentDescriptor(RenderTextureFormat.Depth);
+
+		// At the beginning of the render pass, clear the emission buffer to all black, and the depth buffer to 1.0f
+		desc_diffuse.ConfigureClear(new Color(0.0f, 0.0f, 0.0f, 0.0f), 1.0f, 0);
+		desc_zdepth.ConfigureClear(new Color(), 1.0f, 0);
+
+		// Bind the albedo surface to the current camera target, so the final pass will render the Scene to the screen backbuffer
+		// The second argument specifies whether the existing contents of the surface need to be loaded as the initial values;
+		// in our case we do not need that because we'll be clearing the attachment anyway. This saves a lot of memory
+		// bandwidth on tiled GPUs.
+		// The third argument specifies whether the rendering results need to be written out to memory at the end of
+		// the renderpass. We need this as we'll be generating the final image there.
+		// We could do this in the constructor already, but the camera target may change on the fly, esp. in the editor
+		desc_diffuse.ConfigureTarget(BuiltinRenderTextureType.CameraTarget, false, true);
+
+		// All other attachments are transient surfaces that are not stored anywhere. If the renderer allows,
+		// those surfaces do not even have a memory allocated for the pixel values, saving RAM usage.
+
+		// Start the renderpass using the given scriptable rendercontext, resolution, samplecount, array of attachments that will be used within the renderpass and the depth surface
+		var attachments = new NativeArray<AttachmentDescriptor>(6, Allocator.Temp);
+		const int positionIndex = 0, normalIndex = 1, diffuseIndex = 2, depthIndex = 3, zdepthIndex = 4, targetIndex = 5;
+		attachments[positionIndex] = desc_position;
+		attachments[normalIndex] = desc_normal;
+		attachments[diffuseIndex] = desc_diffuse;
+		attachments[depthIndex] = desc_depth;
+		attachments[zdepthIndex] = desc_zdepth;
+		attachments[targetIndex] = desc_target;
+		context.BeginRenderPass(camera.pixelWidth, camera.pixelHeight, 1, attachments, zdepthIndex);
+		attachments.Dispose();
+
+		// Start the first subpass, GBuffer creation: render to albedo, specRough, normal and emission, no need to read any input attachments
+			var gbufferColors = new NativeArray<int>(4, Allocator.Temp);
+			gbufferColors[0] = positionIndex;
+			gbufferColors[1] = normalIndex;
+			gbufferColors[2] = diffuseIndex;
+			gbufferColors[3] = depthIndex;
+			context.BeginSubPass(gbufferColors);
+				gbufferColors.Dispose();
+				context.DrawRenderers(cullingResults, ref drawingSetting, ref filterSetting);
+			context.EndSubPass();
+			var target = new NativeArray<int>(1, Allocator.Temp);
+			target[0] = targetIndex;
+			context.BeginSubPass(target);
+				target.Dispose();
+		var cb = new CommandBuffer() {
 			name = "ScreenSpaceReflection",
 		};
 		for (int i = 0; i < GBufferIDs.Length; i++) 
@@ -132,59 +203,9 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 		cb.Blit(CameraTarget, null as RenderTexture);
 		ctx.ExecuteCommandBuffer(cb);
 		cb.Release();
-    
-		ctx.Submit();
-		*/
-		// Create the attachment descriptors. If these attachments are not specifically bound to any RenderTexture using the ConfigureTarget calls,
-		// these are treated as temporary surfaces that are discarded at the end of the renderpass
-		var albedo = new AttachmentDescriptor(RenderTextureFormat.ARGB32);
-		var specRough = new AttachmentDescriptor(RenderTextureFormat.ARGB32);
-		var normal = new AttachmentDescriptor(RenderTextureFormat.ARGB2101010);
-		var emission = new AttachmentDescriptor(RenderTextureFormat.ARGBHalf);
-		var depth = new AttachmentDescriptor(RenderTextureFormat.Depth);
 
-		// At the beginning of the render pass, clear the emission buffer to all black, and the depth buffer to 1.0f
-		emission.ConfigureClear(new Color(0.0f, 0.0f, 0.0f, 0.0f), 1.0f, 0);
-		depth.ConfigureClear(new Color(), 1.0f, 0);
-
-		// Bind the albedo surface to the current camera target, so the final pass will render the Scene to the screen backbuffer
-		// The second argument specifies whether the existing contents of the surface need to be loaded as the initial values;
-		// in our case we do not need that because we'll be clearing the attachment anyway. This saves a lot of memory
-		// bandwidth on tiled GPUs.
-		// The third argument specifies whether the rendering results need to be written out to memory at the end of
-		// the renderpass. We need this as we'll be generating the final image there.
-		// We could do this in the constructor already, but the camera target may change on the fly, esp. in the editor
-		albedo.ConfigureTarget(BuiltinRenderTextureType.CameraTarget, false, true);
-
-        // All other attachments are transient surfaces that are not stored anywhere. If the renderer allows,
-        // those surfaces do not even have a memory allocated for the pixel values, saving RAM usage.
-
-        // Start the renderpass using the given scriptable rendercontext, resolution, samplecount, array of attachments that will be used within the renderpass and the depth surface
-        var attachments = new NativeArray<AttachmentDescriptor>(5, Allocator.Temp);
-        const int depthIndex = 0, albedoIndex = 1, specRoughIndex = 2, normalIndex = 3, emissionIndex = 4;
-        attachments[depthIndex] = depth;
-        attachments[albedoIndex] = albedo;
-        attachments[specRoughIndex] = specRough;
-        attachments[normalIndex] = normal;
-        attachments[emissionIndex] = emission;
-        context.BeginRenderPass(camera.pixelWidth, camera.pixelHeight, 1, attachments, depthIndex);
-        attachments.Dispose();
-
-        // Start the first subpass, GBuffer creation: render to albedo, specRough, normal and emission, no need to read any input attachments
-        var gbufferColors = new NativeArray<int>(4, Allocator.Temp);
-        gbufferColors[0] = albedoIndex;
-        gbufferColors[1] = specRoughIndex;
-        gbufferColors[2] = normalIndex;
-        gbufferColors[3] = emissionIndex;
-        context.BeginSubPass(gbufferColors);
-        gbufferColors.Dispose();
-
-	context.DrawRenderers(cullingResults, ref drawingSetting, ref filterSetting);
-        // Render the deferred G-Buffer
-        // RenderGBuffer(cullResults, camera, context);
-
-        context.EndSubPass();
-
+			context.BeginSubPass(
+/*
         // Second subpass, lighting: Render to the emission buffer, read from albedo, specRough, normal and depth.
         // The last parameter indicates whether the depth buffer can be bound as read-only.
         // Note that some renderers (notably iOS Metal) won't allow reading from the depth buffer while it's bound as Z-buffer,
@@ -218,9 +239,9 @@ public class DeferredRenderPipelineInstance : RenderPipeline
         // FinalPass(context);
 
         context.EndSubPass();
-
         context.EndRenderPass();
 	context.Submit();
+*/
 	}
 
 	protected override void Render(ScriptableRenderContext context, Camera[] cameras)
