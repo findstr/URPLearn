@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 23df3275fc4bc05479b4b04c99b33f5e, type: 3}
+  m_Name: Deferred-SSR
+  m_EditorClassIdentifier: 
+  GPosition: {fileID: 8400000, guid: 707f996330d98e54097f3a0fb641eb6b, type: 2}
+  GNormal: {fileID: 8400000, guid: f704c85dc09204a4d86d9edab717768f, type: 2}
+  GDiffuse: {fileID: 8400000, guid: 75c7dac39ed156149843f333cc063d4a, type: 2}
+  GDepth: {fileID: 8400000, guid: 81694233e5ffb2c4e95ed5ba9d629537, type: 2}
+  Target: {fileID: 8400000, guid: 618e0dee1125a4372aee38ac97f61c32, type: 2}
+  MatSSR: {fileID: 2100000, guid: 56a4ad00fcfa03249b3de9351bf57473, type: 2}
