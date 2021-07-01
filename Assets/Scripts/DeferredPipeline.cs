@@ -4,7 +4,7 @@ using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class DeferredRenderPipelineInstance : RenderPipeline
+public class DeferredRenderPipeline : RenderPipeline
 {
 	private RenderTexture CameraTarget;
 	private RenderTexture DepthTexture;
@@ -29,7 +29,7 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 		rt.height = Screen.height;
 		rt.Create();
 	}
-	public DeferredRenderPipelineInstance(DeferredRenderPipelineAsset asset) {
+	public DeferredRenderPipeline(DeferredRenderPipelineAsset asset) {
 		this.asset = asset;
 		
 		CameraTarget = asset.Target;
@@ -43,14 +43,14 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 		Resize(asset.GDepth);
 
 		GBufferTextures = new RenderTexture[] {
+			asset.GDiffuse,
 			asset.GPosition,
 			asset.GNormal,
-			asset.GDiffuse,
 			asset.GDepth,
 		};
-		GBufferTextures[0].name = "_GPosition";
-		GBufferTextures[1].name = "_GNormal";
-		GBufferTextures[2].name = "_GDiffuse";
+		GBufferTextures[0].name = "_GDiffuse";
+		GBufferTextures[1].name = "_GPosition";
+		GBufferTextures[2].name = "_GNormal";
 		GBufferTextures[3].name = "_GDepth";
 
 		GBuffers = new RenderBuffer[GBufferTextures.Length];
@@ -76,6 +76,10 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 		var filterSetting = FilteringSettings.defaultValue;
 		var drawingSetting = new DrawingSettings(shaderGBuffer, sortingSettings);
 
+		Light light = RenderSettings.sun;
+		Shader.SetGlobalVector(_MainLightPosition, -light.transform.forward);
+		Shader.SetGlobalVector(_MainLightColor, light.color.linear * light.intensity);
+
 		ctx.DrawRenderers(cullingResults, ref drawingSetting, ref filterSetting);
 		
 		if (cam.clearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null)
@@ -94,7 +98,7 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 
 		Light light = RenderSettings.sun;
 		Shader.SetGlobalVector(_MainLightPosition, -light.transform.forward);
-		Shader.SetGlobalVector(_MainLightColor, light.color.linear);
+		Shader.SetGlobalVector(_MainLightColor, light.color.linear * light.intensity);
 		Shader.SetGlobalTexture(_DepthTexture, DepthTexture);
 		for (int i = 0; i < GBufferTextures.Length; i++) { 
 			Resize(GBufferTextures[i]);
@@ -130,7 +134,8 @@ public class DeferredRenderPipelineInstance : RenderPipeline
 		cb.Blit(CameraTarget, null as RenderTexture);
 		context.ExecuteCommandBuffer(cb);
 		cb.Release();
-    
+ 
+   
 		context.Submit();
 
 		/*

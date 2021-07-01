@@ -13,7 +13,7 @@ public class DeferredRenderPipelineAsset : RenderPipelineAsset
         public RenderTexture Target;
         public Material MatSSR;
         protected override RenderPipeline CreatePipeline() {
-                return new DeferredRenderPipelineInstance(this);
+                return new DeferredRenderPipeline(this);
         }
 }
 
