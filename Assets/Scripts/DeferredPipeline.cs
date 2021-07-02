@@ -1,8 +1,63 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
+
+class Lighting
+{
+	private const int MAX_DIRECTIONAL_LIGHT = 4;
+	private int id_light_directional_count;
+    private int id_light_directional_color;
+    private int id_light_directional_direction;
+
+	private const string bufferName = "Lighting";
+	private CommandBuffer cb = new CommandBuffer { name = bufferName };
+
+	private int light_directional_count = 0;
+	private Vector4[] light_directional_color		= new Vector4[MAX_DIRECTIONAL_LIGHT];
+	private Vector4[] light_directional_direction	= new Vector4[MAX_DIRECTIONAL_LIGHT];
+
+	public Lighting()
+    {
+		id_light_directional_count = Shader.PropertyToID("light_directional_count");
+		id_light_directional_color = Shader.PropertyToID("light_directional_color");
+		id_light_directional_direction = Shader.PropertyToID("light_directional_direction");
+    }
+	public void Setup(ref ScriptableRenderContext ctx, ref CullingResults cr)
+    {
+		light_directional_count = 0;
+		cb.BeginSample(bufferName);
+		NativeArray<VisibleLight> lights = cr.visibleLights;
+		for (int i = 0; i < lights.Length; i++) {
+			VisibleLight vl = lights[i];
+			switch (vl.lightType) {
+			case LightType.Directional:
+				if (light_directional_count >= MAX_DIRECTIONAL_LIGHT)
+					continue;
+				light_directional_color[light_directional_count] = vl.finalColor;
+				light_directional_direction[light_directional_count] = -vl.localToWorldMatrix.GetColumn(2);
+				++light_directional_count;
+				break;
+			case LightType.Point:
+				break;
+			case LightType.Spot:
+				break;
+			default:
+				Debug.LogError("DeferredPipeline: not support:" + vl.lightType);
+				break;
+            }
+        }
+		Debug.Log("LightCount:" + light_directional_count);
+		cb.SetGlobalInt(id_light_directional_count, light_directional_count);
+		cb.SetGlobalVectorArray(id_light_directional_color, light_directional_color);
+		cb.SetGlobalVectorArray(id_light_directional_direction, light_directional_direction);
+		cb.EndSample(bufferName);
+		ctx.ExecuteCommandBuffer(cb);
+		cb.Clear();
+    }
+} 
 
 public class DeferredRenderPipeline : RenderPipeline
 {
@@ -13,13 +68,12 @@ public class DeferredRenderPipeline : RenderPipeline
 	private int[] GBufferIDs;
 	private int _CameraPos;
 	private int _MatrixVP;
-	private int _MainLightPosition;
-	private int _MainLightColor;
 	private int _ProjectionParams;
 	private int _LightDirection;
 	private ShaderTagId shaderGBuffer;
 	private static int _DepthTexture = Shader.PropertyToID("_DepthTexture");
 	private DeferredRenderPipelineAsset asset;
+	private Lighting light = new Lighting();
 	private void Resize(RenderTexture rt)
 	{
 		if (rt.width == Screen.width && rt.height == Screen.height)
@@ -31,7 +85,7 @@ public class DeferredRenderPipeline : RenderPipeline
 	}
 	public DeferredRenderPipeline(DeferredRenderPipelineAsset asset) {
 		this.asset = asset;
-		
+		GraphicsSettings.lightsUseLinearIntensity = true;
 		CameraTarget = asset.Target;
 		DepthTexture = new RenderTexture(Screen.width, Screen.height, 24, RenderTextureFormat.Depth, RenderTextureReadWrite.Linear);
 		DepthTexture.name = "DepthTexture";
@@ -60,14 +114,14 @@ public class DeferredRenderPipeline : RenderPipeline
 			GBufferIDs[i] = Shader.PropertyToID(GBufferTextures[i].name);
 		}
 
-		_MainLightColor = Shader.PropertyToID("_MainLightColor");
-		_MainLightPosition = Shader.PropertyToID("_MainLightPosition");
 		_MatrixVP = Shader.PropertyToID("_MATRIX_VP");
 		_CameraPos = Shader.PropertyToID("_CameraPos");
 		_ProjectionParams = Shader.PropertyToID("_ProjectionArgs");
 		_LightDirection = Shader.PropertyToID("_LightDirection");
 		shaderGBuffer = new ShaderTagId("GBuffer");
 	}
+
+
 	protected void RenderScene(ScriptableRenderContext ctx, Camera cam) { 
 		cam.TryGetCullingParameters(out var cullingPameters);
 		var cullingResults = ctx.Cull(ref cullingPameters);
@@ -75,10 +129,6 @@ public class DeferredRenderPipeline : RenderPipeline
 		var sortingSettings = new SortingSettings(cam);
 		var filterSetting = FilteringSettings.defaultValue;
 		var drawingSetting = new DrawingSettings(shaderGBuffer, sortingSettings);
-
-		Light light = RenderSettings.sun;
-		Shader.SetGlobalVector(_MainLightPosition, -light.transform.forward);
-		Shader.SetGlobalVector(_MainLightColor, light.color.linear * light.intensity);
 
 		ctx.DrawRenderers(cullingResults, ref drawingSetting, ref filterSetting);
 		
@@ -92,13 +142,11 @@ public class DeferredRenderPipeline : RenderPipeline
 		camera.TryGetCullingParameters(out var cullingPameters);
 		var cullingResults = context.Cull(ref cullingPameters);
 		context.SetupCameraProperties(camera);
+		light.Setup(ref context, ref cullingResults);
 		var sortingSettings = new SortingSettings(camera);
 		var filterSetting = FilteringSettings.defaultValue;
 		var drawingSetting = new DrawingSettings(shaderGBuffer, sortingSettings);
 
-		Light light = RenderSettings.sun;
-		Shader.SetGlobalVector(_MainLightPosition, -light.transform.forward);
-		Shader.SetGlobalVector(_MainLightColor, light.color.linear * light.intensity);
 		Shader.SetGlobalTexture(_DepthTexture, DepthTexture);
 		for (int i = 0; i < GBufferTextures.Length; i++) { 
 			Resize(GBufferTextures[i]);
