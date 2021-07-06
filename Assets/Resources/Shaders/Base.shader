@@ -16,7 +16,7 @@ Shader "LearnURP/Base"
         Pass
         {
             HLSLPROGRAM
-            //#pragma enable_d3d11_debug_symbols
+            #pragma enable_d3d11_debug_symbols
             #pragma vertex vert
             #pragma fragment frag
 
@@ -152,8 +152,24 @@ Shader "LearnURP/Base"
                 for (int i = 0; i < light_directional_count; i++) {
                     c.rgb += lighting_directional(s, brdf, i);
                 }
+                c.rgb = half3(1,0,0);
                 return c;
             }
+            ENDHLSL
+        }
+        Pass {
+            Tags {
+                "LightMode" = "ShadowCaster"
+            }
+            ColorMask 0 
+            HLSLPROGRAM
+            #pragma enable_d3d11_debug_symbols
+            #pragma target 3.5
+            #pragma shader_feature _ALPHATEST_ON
+            #pragma multi_compile_instancing
+			#pragma vertex ShadowCasterPassVertex
+            #pragma fragment ShadowCasterPassFragment
+            #include "ShadowCaster.hlsl"
             ENDHLSL
         }
     }

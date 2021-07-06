@@ -18,3 +18,7 @@ MonoBehaviour:
   GDepth: {fileID: 8400000, guid: 81694233e5ffb2c4e95ed5ba9d629537, type: 2}
   Target: {fileID: 8400000, guid: 618e0dee1125a4372aee38ac97f61c32, type: 2}
   MatSSR: {fileID: 2100000, guid: 56a4ad00fcfa03249b3de9351bf57473, type: 2}
+  shadows:
+    maxDistance: 10
+    directional:
+      atlasSize: 2048

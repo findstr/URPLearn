@@ -12,6 +12,8 @@ public class DeferredRenderPipelineAsset : RenderPipelineAsset
         public RenderTexture GDepth;
         public RenderTexture Target;
         public Material MatSSR;
+        [SerializeField]
+        public ShadowSetting shadows = default;
         protected override RenderPipeline CreatePipeline() {
                 return new DeferredRenderPipeline(this);
         }
