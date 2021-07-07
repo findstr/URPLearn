@@ -1,0 +1,7 @@
+{
+	"hlsl.additionalIncludeDirectories": [
+		".",
+		"../",
+		"E:\\",
+	]
+}

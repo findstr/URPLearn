@@ -1,0 +1,6 @@
+#ifndef CONFIG_INCLUDED
+#define CONFIG_INCLUDED
+
+#define MAX_VISIBLE_LIGHT_COUNT  4
+
+#endif
