@@ -16,11 +16,13 @@ Shader "LearnURP/Base"
         Pass
         {
             HLSLPROGRAM
-            //#pragma enable_d3d11_debug_symbols
+            #pragma enable_d3d11_debug_symbols
 
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile _ _DIRECTIONAL_PCF3 _DIRECTIONAL_PCF5 _DIRECTIONAL_PCF7
+            #pragma multi_compile _ _CASCADE_BLEND_SOFT _CASCADE_BLEND_DITHER
+            #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
@@ -90,6 +92,7 @@ Shader "LearnURP/Base"
                 s.metallic = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Metallic);
                 s.smoothness = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Smoothness);
                 s.depth = -TransformWorldToView(i.positionWS).z;
+                s.dither = InterleavedGradientNoise(i.vertex.xy, 0);
                 BRDF brdf = get_brdf(s);
                 CascadeInfo ci = GetCascadeInfo(s);
                 for (int i = 0; i < light_directional_count; i++) {

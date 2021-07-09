@@ -79,17 +79,24 @@ CascadeInfo GetCascadeInfo(surface s)
         float4 sphere = _CascadeSphere[i];
         float dist = DistanceSquared(sphere.xyz, s.position.xyz);
         if (dist < sphere.w) {
-            ci.cascadeIndex = i;
-            ci.strength = FadeShadowStrength(s.depth);
             float fade = FadeCascadeStrength(i, dist, sphere);
+            ci.strength = FadeShadowStrength(s.depth);
             if (i == _CascadeCount - 1) {
                 ci.strength *= fade;
             } else {
                 ci.blend = fade;
             }
+#if defined(_CASCADE_BLEND_DITHER)
+            if (fade < s.dither)
+                i += 1;
+#endif
+            ci.cascadeIndex = i;
             break;
         }
     }
+    #if !defined(_CASCADE_BLEND_SOFT)
+        ci.blend = 1.0;
+	#endif
     ci.cascadeIndex = i;
     return ci;
 }
@@ -129,6 +136,11 @@ float GetShadowAttenuation(int light, surface sf, CascadeInfo ci)
     float3 normalBias = sf.normal * _CascadeData[ci.cascadeIndex].y;
     float3 posSM = mul(_DirectionalShadowMatrices[sd.tiledIndex], float4(sf.position + normalBias, 1.0)).xyz;
     float shadow = FilterDirectionalShadow(posSM);
+    if (ci.blend < 1.0) {
+        normalBias = sf.normal * _CascadeData[ci.cascadeIndex + 1].y;
+        posSM = mul(_DirectionalShadowMatrices[sd.tiledIndex+1], float4(sf.position + normalBias, 1.0)).xyz;
+        shadow = lerp(FilterDirectionalShadow(posSM), shadow, ci.blend);
+    }
     return lerp(1.0, shadow, sd.strength);
 }
 

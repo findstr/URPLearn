@@ -28,6 +28,10 @@ public class ShadowPass
         "_DIRECTIONAL_PCF5",
         "_DIRECTIONAL_PCF7",
     };
+    static string[] cascadeBlendKeywords = {
+		"_CASCADE_BLEND_SOFT",
+		"_CASCADE_BLEND_DITHER"
+	};
 
     private int shadow_count = 0;
     private ShadowLight[] shadow_lights = new ShadowLight[max_shadow_count];
@@ -36,14 +40,13 @@ public class ShadowPass
     private Vector4[] cascade_sphere = new Vector4[max_cascade_count];
     private Vector4[] cascade_data = new Vector4[max_cascade_count];
 
-    private void SetKeywords(RenderContext ctx, CommandBuffer cmd)
+    private void SetKeywords(CommandBuffer cmd, string[] keywords, int enable)
     {
-        int enable = (int)ctx.shadow_setting.directional.filter - 1;
-        for (int i = 0; i < shadowFilterKeywords.Length; i++) {
+        for (int i = 0; i < keywords.Length; i++) {
             if (i == enable)
-                cmd.EnableShaderKeyword(shadowFilterKeywords[i]);
+                cmd.EnableShaderKeyword(keywords[i]);
             else
-                cmd.DisableShaderKeyword(shadowFilterKeywords[i]);
+                cmd.DisableShaderKeyword(keywords[i]);
         }
     }
 
@@ -142,12 +145,14 @@ public class ShadowPass
         for (int i = 0; i < shadow_count; i++) {
             int tile_start = i * cascade_count;
             var light_index = shadow_lights[i].lightIndex;
+            float cullingFactor = Mathf.Max(0f, 0.8f - setting.directional.cascadeFade);
             for (int j = 0; j < cascade_count; j++) { 
                 var view_offset = shadowmap_tile(split_count, tile_start + j);
                 var view_port = view_offset * tile_size;
                 cull.ComputeDirectionalShadowMatricesAndCullingPrimitives(
                     light_index, j, cascade_count, ctx.shadow_setting.directional.cascadeRatios, tile_size, 
                     shadow_lights[i].nearPlaneOffset, out Matrix4x4 V, out Matrix4x4 P, out ShadowSplitData split_data);
+                split_data.shadowCascadeBlendCullingFactor = cullingFactor;
                 var sds = new ShadowDrawingSettings(cull, light_index) {
                     splitData = split_data 
                 };
@@ -176,7 +181,8 @@ public class ShadowPass
         cmd.SetGlobalInt(shader_prop_cascade_count, cascade_count);
         cmd.SetGlobalVectorArray(shader_prop_cascade_sphere, cascade_sphere);
         cmd.SetGlobalVectorArray(shader_prop_cascade_data, cascade_data);
-        SetKeywords(ctx, cmd);
+        SetKeywords(cmd, shadowFilterKeywords, (int)setting.directional.filter - 1);
+        SetKeywords(cmd, cascadeBlendKeywords, (int)setting.directional.cascadeBlend - 1);
         ctx.command_end();
     }
 

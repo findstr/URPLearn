@@ -14,10 +14,15 @@ public class ShadowSetting {
     {
         PCF2x2, PCF3x3, PCF5x5, PCF7x7
     };
+    public enum CascadeBlendMode
+    {
+        Hard, Soft, Dither
+    };
     [System.Serializable]
     public struct Directional {
         public TextureSize atlasSize;
         public FilterMode filter;
+        public CascadeBlendMode cascadeBlend;
         [Range(1,4)]
         public int cascadeCount;
         [Range(0f, 1f)]
@@ -33,6 +38,7 @@ public class ShadowSetting {
     public Directional directional = new Directional { 
         atlasSize = TextureSize._1024,
         filter = FilterMode.PCF2x2,
+        cascadeBlend = CascadeBlendMode.Hard,
         cascadeCount = 4,
         cascadeRatio1 = 0.1f,
         cascadeRatio2 = 0.25f,
