@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 class Lighting
 {
-	private const int MAX_DIRECTIONAL_LIGHT = 4;
+	private const int MAX_DIRECTIONAL_LIGHT = Config.MAX_LIGHT_COUNT;
 	private int id_light_directional_count;
     private int id_light_directional_color;
     private int id_light_directional_direction;

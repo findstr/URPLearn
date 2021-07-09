@@ -19,6 +19,13 @@ MonoBehaviour:
   Target: {fileID: 8400000, guid: 618e0dee1125a4372aee38ac97f61c32, type: 2}
   MatSSR: {fileID: 2100000, guid: 56a4ad00fcfa03249b3de9351bf57473, type: 2}
   shadows:
-    maxDistance: 10
+    maxDistance: 40
+    distanceFade: 1.62
     directional:
       atlasSize: 2048
+      filter: 3
+      cascadeCount: 4
+      cascadeRatio1: 0.1
+      cascadeRatio2: 0.25
+      cascadeRatio3: 0.5
+      cascadeFade: 0.23

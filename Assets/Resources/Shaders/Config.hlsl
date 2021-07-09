@@ -2,5 +2,6 @@
 #define CONFIG_INCLUDED
 
 #define MAX_VISIBLE_LIGHT_COUNT  4
+#define MAX_CASCADE_COUNT 4
 
 #endif

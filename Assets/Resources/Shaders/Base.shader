@@ -16,9 +16,11 @@ Shader "LearnURP/Base"
         Pass
         {
             HLSLPROGRAM
-            #pragma enable_d3d11_debug_symbols
+            //#pragma enable_d3d11_debug_symbols
+
             #pragma vertex vert
             #pragma fragment frag
+            #pragma multi_compile _ _DIRECTIONAL_PCF3 _DIRECTIONAL_PCF5 _DIRECTIONAL_PCF7
 
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
@@ -26,6 +28,9 @@ Shader "LearnURP/Base"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
+            #include "surface.hlsl"
+            #include "Lighting.hlsl"
+            #include "Shadows.hlsl"
 
             #define M_PI 3.1415926535897932384626433832795
             #define MAX_DIRECTIONAL_LIGHT 4
@@ -45,31 +50,6 @@ Shader "LearnURP/Base"
                 float4 vertex : SV_POSITION;
             };
 
-            struct surface {
-                float4 color;
-                float3 normal;
-                float metallic;
-                float smoothness;
-                float3 viewdir;
-            };
-
-            struct light {
-                float3 color;
-                float3 direction;
-            };
-
-            struct BRDF {
-                float3 diffuse;
-                float3 specular;
-                float roughness;
-            };
- 
-            CBUFFER_START(_CustomLight)
-                int light_directional_count;
-                half4  light_directional_color[MAX_DIRECTIONAL_LIGHT];
-                float4 light_directional_direction[MAX_DIRECTIONAL_LIGHT];
-            CBUFFER_END
-
             BRDF get_brdf(surface s) 
             {
                 BRDF brdf;
@@ -79,46 +59,6 @@ Shader "LearnURP/Base"
                 brdf.roughness = PerceptualRoughnessToRoughness(PerceptualSmoothnessToPerceptualRoughness(s.smoothness));
                 return brdf;
             } 
-
-            light get_direciontal_light(int idx) 
-            {
-                light l;
-                l.color = light_directional_color[idx].rgb;
-                l.direction = light_directional_direction[idx].xyz;
-                return l;
-            }
-
-            float square(float v) 
-            {
-                return v * v;
-            }
-
-            float specular_strength(surface s, BRDF brdf, light l)
-            {
-                    float3 h = SafeNormalize(l.direction + s.viewdir);
-                    float nh2 = square(saturate(dot(s.normal, h)));
-                    float lh2 = square(saturate(dot(l.direction, h)));
-                    float r2 = square(brdf.roughness);
-                    float d2 = square(nh2 * (r2 - 1.0) + 1.00001);
-                    float norm = brdf.roughness * 4.0 + 2.0;
-                    return r2 / (d2 * max(0.1, lh2)) * norm;
-            }
-
-            float3 light_radiance (surface s, light l) 
-            {
-	            return saturate(dot(s.normal, l.direction)) * l.color;
-            }
- 
-            float3 direct_brdf(surface s, BRDF brdf, light l) 
-            {
-                return specular_strength(s, brdf, l) * brdf.specular + brdf.diffuse;
-            }
-
-            float3 lighting_directional(surface s, BRDF brdf, int i) 
-            {
-                light l = get_direciontal_light(i);
-                return light_radiance(s, l) * direct_brdf(s, brdf, l);
-            }
 
             CBUFFER_START(UnityPerMaterial)
                 UNITY_DEFINE_INSTANCED_PROP(float4, _MainTex_ST);
@@ -143,16 +83,18 @@ Shader "LearnURP/Base"
             {
                 float4 c = float4(0,0,0,1);
                 surface s;
-                s.color = _Color;
+                s.position = i.positionWS;
+                s.color = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv.xy);
                 s.normal = normalize(i.normal);
                 s.viewdir = normalize(_WorldSpaceCameraPos - i.positionWS);
                 s.metallic = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Metallic);
                 s.smoothness = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Smoothness);
+                s.depth = -TransformWorldToView(i.positionWS).z;
                 BRDF brdf = get_brdf(s);
+                CascadeInfo ci = GetCascadeInfo(s);
                 for (int i = 0; i < light_directional_count; i++) {
-                    c.rgb += lighting_directional(s, brdf, i);
+                    c.rgb += lighting_directional(s, brdf, i, ci);
                 }
-                c.rgb = half3(1,0,0);
                 return c;
             }
             ENDHLSL

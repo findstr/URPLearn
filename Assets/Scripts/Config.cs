@@ -6,5 +6,6 @@ using System.Threading.Tasks;
     
 class Config
 {
-    public const int MAX_VISIBLE_LIGHT_COUNT = 4;
+    public const int MAX_LIGHT_COUNT = 4;
+    public const int MAX_CASCADE_COUNT = 4;
 }

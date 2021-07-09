@@ -4,12 +4,12 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 public class CameraRender {
-	private Shadows shadows = new Shadows();
+	private ShadowPass shadows = new ShadowPass();
 	private Lighting lighting = new Lighting();
 	private RenderContext render_ctx = new RenderContext();
 	private ShaderTagId shaderGBuffer = new ShaderTagId("GBuffer");
 
-	public void SetShadowSetting(ref ShadowSetting ss)
+	public CameraRender(ref ShadowSetting ss)
 	{ 
 		render_ctx.shadow_setting = ss;
 	}
@@ -18,9 +18,10 @@ public class CameraRender {
     {
 		render_ctx.ctx = src;
 		render_ctx.camera = cam;
-		render_ctx.camera.TryGetCullingParameters(out var cullingPameters);
-		render_ctx.cull_result = render_ctx.ctx.Cull(ref cullingPameters);
-		render_ctx.ctx.SetupCameraProperties(render_ctx.camera);
+		if (render_ctx.camera.TryGetCullingParameters(out var p)) {
+			p.shadowDistance = Mathf.Min(render_ctx.shadow_setting.maxDistance, cam.farClipPlane);
+			render_ctx.cull_result = render_ctx.ctx.Cull(ref p);
+		}
     }
 
 	private void cleanup()
@@ -30,6 +31,7 @@ public class CameraRender {
 
 	private void clear_screen()
     {
+		render_ctx.ctx.SetupCameraProperties(render_ctx.camera);
 		var cmd = render_ctx.command_begin("ClearScreen");
 		cmd.ClearRenderTarget(true, true, Color.black);
 		render_ctx.command_end();
