@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -46,13 +47,23 @@ public class CameraRender {
     {
 		var sortingSettings = new SortingSettings(render_ctx.camera);
 		var filterSetting = FilteringSettings.defaultValue;
-		var drawingSetting = new DrawingSettings(shaderGBuffer, sortingSettings);
+		var drawingSetting = new DrawingSettings(shaderGBuffer, sortingSettings) {
+			enableDynamicBatching = true,
+			enableInstancing = true,
+			perObjectData = PerObjectData.Lightmaps | PerObjectData.LightProbe | PerObjectData.LightProbeProxyVolume,
+		};
 		lighting.setup(render_ctx);
 		render_ctx.ctx.DrawRenderers(render_ctx.cull_result, ref drawingSetting, ref filterSetting);
 
 		if (render_ctx.camera.clearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null)
 			render_ctx.ctx.DrawSkybox(render_ctx.camera);
-		
+
+#if UNITY_EDITOR
+		if (Handles.ShouldRenderGizmos()) {
+			render_ctx.ctx.DrawGizmos(render_ctx.camera, GizmoSubset.PreImageEffects);
+			render_ctx.ctx.DrawGizmos(render_ctx.camera, GizmoSubset.PostImageEffects);
+        }	
+#endif
     }
 
     public void Render(ScriptableRenderContext src, Camera cam)

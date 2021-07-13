@@ -6,6 +6,7 @@
 #include "Surface.hlsl"
 #include "Brdf.hlsl"
 #include "Shadows.hlsl"
+#include "GI.hlsl"
 
 CBUFFER_START(_CustomLight)
     int light_directional_count;
@@ -58,6 +59,16 @@ float3 lighting_directional(surface s, BRDF brdf, int i, CascadeInfo ci)
 {
     light l = get_direciontal_light(i);
     return light_radiance(s, l, i, ci) * direct_brdf(s, brdf, l);
+}
+
+float3 GetLighting(surface s, BRDF brdf, GI gi)
+{
+    CascadeInfo ci = GetCascadeInfo(s);
+    float3 color = gi.diffuse * brdf.diffuse;
+    for (int i = 0; i < light_directional_count; i++) {
+        color += lighting_directional(s, brdf, i, ci);
+    }
+    return color;
 }
 
 #endif
