@@ -33,7 +33,13 @@ public class ShadowPass
 		"_CASCADE_BLEND_DITHER"
 	};
 
+    static string[] shadowMaskKeywords = {
+        "_SHADOW_MASK_ALWAYS",
+        "_SHADOW_MASK_DISTANCE",
+    };
+
     private int shadow_count = 0;
+    private bool useShadowMask;
     private ShadowLight[] shadow_lights = new ShadowLight[max_shadow_count];
     private Matrix4x4[] shadow_matrices = new Matrix4x4[max_shadow_count * max_cascade_count];
     private Vector4[] shadow_data = new Vector4[max_shadow_count];
@@ -55,19 +61,28 @@ public class ShadowPass
         var cull = ctx.cull_result;
 		var lights = cull.visibleLights;
 		shadow_count = 0;
+        useShadowMask = false;
 		for (int i = 0; i < lights.Length && shadow_count < max_shadow_count; i++) {
+            float maskChannel = -1;
 			VisibleLight vl = lights[i];
             Light light = vl.light;
 			switch (vl.lightType) {
 			case LightType.Directional:
                 if (light.shadows != LightShadows.None && light.shadowStrength > 0f && cull.GetShadowCasterBounds(i, out Bounds b)) {
+                    LightBakingOutput lightBaking = light.bakingOutput;
                     shadow_lights[shadow_count] = new ShadowLight {
-                        lightIndex = i, slopeScaleBias = light.shadowBias, nearPlaneOffset = light.shadowNearPlane
+                        lightIndex = i, 
+                        slopeScaleBias = light.shadowBias, 
+                        nearPlaneOffset = light.shadowNearPlane
                     };
-                    shadow_data[i] = new Vector4(light.shadowStrength, shadow_count * ctx.shadow_setting.directional.cascadeCount);
+                    useShadowMask = (lightBaking.lightmapBakeType == LightmapBakeType.Mixed && lightBaking.mixedLightingMode == MixedLightingMode.Shadowmask);
+                    if (useShadowMask == true) {
+                        maskChannel = lightBaking.occlusionMaskChannel;
+                    }
+                    shadow_data[i] = new Vector4(light.shadowStrength, shadow_count * ctx.shadow_setting.directional.cascadeCount, light.shadowNormalBias, maskChannel);
                     shadow_count++;
                 } else {
-                    shadow_data[i] = new Vector4(0, -1);
+                    shadow_data[i] = new Vector4(0, -1, -1);
                 }
                 break;
             default:
@@ -125,12 +140,13 @@ public class ShadowPass
         return m;
     }
 
-    private void set_cascade_data(int i, Vector4 cullingSphere, float tileSize)
+    private void set_cascade_data(RenderContext ctx, int i, Vector4 cullingSphere, float tileSize)
     {
         float texelSize = 2f * cullingSphere.w / tileSize;
+        float filterSize = texelSize * ((float)ctx.shadow_setting.directional.filter + 1f);
         cullingSphere.w *= cullingSphere.w;
         cascade_sphere[i] = cullingSphere;
-        cascade_data[i] = new Vector4(1f / cullingSphere.w, texelSize * 1.4142136f);
+        cascade_data[i] = new Vector4(1f / cullingSphere.w, filterSize * 1.4142136f);
     }
 
     private void draw_shadow(RenderContext ctx)
@@ -145,6 +161,7 @@ public class ShadowPass
         for (int i = 0; i < shadow_count; i++) {
             int tile_start = i * cascade_count;
             var light_index = shadow_lights[i].lightIndex;
+            var slopeBias = shadow_lights[i].slopeScaleBias;
             float cullingFactor = Mathf.Max(0f, 0.8f - setting.directional.cascadeFade);
             for (int j = 0; j < cascade_count; j++) { 
                 var view_offset = shadowmap_tile(split_count, tile_start + j);
@@ -157,18 +174,18 @@ public class ShadowPass
                     splitData = split_data 
                 };
                 if (i == 0) { 
-                    set_cascade_data(j, split_data.cullingSphere, tile_size);
+                    set_cascade_data(ctx, j, split_data.cullingSphere, tile_size);
                 }
                 var cb = ctx.command_begin("ShadowDraw");
                 cb.SetViewport(new Rect(view_port.x, view_port.y, tile_size, tile_size));
                 shadow_matrices[tile_start + j] = shadowmap_matrix(P * V, view_offset, split_count);
                 cb.SetViewProjectionMatrices(V, P);
-                //cb.SetGlobalDepthBias(0f, 3f);
+                cb.SetGlobalDepthBias(0f, slopeBias);
                 ctx.command_end();
                 ctx.ctx.DrawShadows(ref sds);
-                //cb = ctx.command_begin("ShadowDraw");
-                //cb.SetGlobalDepthBias(0f, 0f);
-                //ctx.command_end();
+                cb = ctx.command_begin("ShadowDraw");
+                cb.SetGlobalDepthBias(0f, 0f);
+                ctx.command_end();
             }
         }
         var cmd = ctx.command_begin("ShadowVariable");
@@ -183,6 +200,7 @@ public class ShadowPass
         cmd.SetGlobalVectorArray(shader_prop_cascade_data, cascade_data);
         SetKeywords(cmd, shadowFilterKeywords, (int)setting.directional.filter - 1);
         SetKeywords(cmd, cascadeBlendKeywords, (int)setting.directional.cascadeBlend - 1);
+        SetKeywords(cmd, shadowMaskKeywords, useShadowMask ? (QualitySettings.shadowmaskMode == ShadowmaskMode.Shadowmask ? 0 : 1) : -1);
         ctx.command_end();
     }
 

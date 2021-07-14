@@ -64,6 +64,7 @@ float3 lighting_directional(surface s, BRDF brdf, int i, CascadeInfo ci)
 float3 GetLighting(surface s, BRDF brdf, GI gi)
 {
     CascadeInfo ci = GetCascadeInfo(s);
+    ci.shadowMask = gi.shadowMask;
     float3 color = gi.diffuse * brdf.diffuse;
     for (int i = 0; i < light_directional_count; i++) {
         color += lighting_directional(s, brdf, i, ci);

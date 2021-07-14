@@ -41,7 +41,7 @@ v2f LitPassVertex (appdata v)
     GI_TRANSFER_DATA(v, o);
     o.vertex = TransformObjectToHClip(v.vertex.xyz);
     o.uv.xy = TransformBaseUV(v.uv);
-    o.normal = v.normal;
+    o.normal = TransformObjectToWorldNormal(v.normal);
     o.positionWS = TransformObjectToWorld(v.vertex.xyz);
     return o;
 }

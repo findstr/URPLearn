@@ -1,7 +1,10 @@
 #ifndef SHADOWS_PASS_INCLUDED
 #define SHADOWS_PASS_INCLUDED
 
-
+#if defined(_SHADOW_MASK_ALWAYS) || defined(_SHADOW_MASK_DISTANCE)
+	#define SHADOWS_SHADOWMASK
+#endif
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Shadow/ShadowSamplingTent.hlsl"
 #include "Config.hlsl"
@@ -36,17 +39,27 @@ CBUFFER_START(_CustomShadows)
 
 CBUFFER_END
 
+struct ShadowMask
+{
+    bool always;
+    bool distance;
+    float4 shadows;
+};
+
 struct CascadeInfo
 {
     int cascadeIndex;
     float strength;
     float blend;
+    ShadowMask shadowMask;
 };
 
 struct ShadowInfo
 {
     float strength;
     int tiledIndex;
+    float normaBias;
+    int shadowMaskChannel;
 };
 
 float DistanceSquared(float3 a, float3 b)
@@ -74,6 +87,8 @@ CascadeInfo GetCascadeInfo(surface s)
     ci.cascadeIndex = 0;
     ci.strength = 0.0;
     ci.blend = 1.0;
+    ci.shadowMask.distance = false;
+    ci.shadowMask.shadows = 1.0;
     for (i = 0; i < _CascadeCount; i++)
     {
         float4 sphere = _CascadeSphere[i];
@@ -104,9 +119,11 @@ CascadeInfo GetCascadeInfo(surface s)
 ShadowInfo GetShadowData(int light, CascadeInfo ci)
 {
     ShadowInfo sd;
-    float2 data =  _DirectionalLightShadowData[light].xy;
-    sd.strength = data.x * ci.strength;
+    float4 data =  _DirectionalLightShadowData[light].xyzw;
+    sd.strength = data.x;
     sd.tiledIndex = data.y + ci.cascadeIndex;
+    sd.normaBias = data.z;
+    sd.shadowMaskChannel = data.w;
     return sd;
 }
 
@@ -128,21 +145,65 @@ float FilterDirectionalShadow(float3 posSM)
 #endif
 }
 
-float GetShadowAttenuation(int light, surface sf, CascadeInfo ci)
+float GetCascadedShadow(ShadowInfo sd, CascadeInfo ci, surface sf)
 {
-    ShadowInfo sd = GetShadowData(light, ci);
-    if (sd.strength <= 0.0)
-        return 1.0;
-    float3 normalBias = sf.normal * _CascadeData[ci.cascadeIndex].y;
+    float3 normalBias = sf.normal * (sd.normaBias * _CascadeData[ci.cascadeIndex].y);
     float3 posSM = mul(_DirectionalShadowMatrices[sd.tiledIndex], float4(sf.position + normalBias, 1.0)).xyz;
     float shadow = FilterDirectionalShadow(posSM);
     if (ci.blend < 1.0) {
-        normalBias = sf.normal * _CascadeData[ci.cascadeIndex + 1].y;
+        normalBias = sf.normal * (sd.normaBias * _CascadeData[ci.cascadeIndex + 1].y);
         posSM = mul(_DirectionalShadowMatrices[sd.tiledIndex+1], float4(sf.position + normalBias, 1.0)).xyz;
         shadow = lerp(FilterDirectionalShadow(posSM), shadow, ci.blend);
     }
-    return lerp(1.0, shadow, sd.strength);
+    return shadow;
 }
 
+float GetBakedShadow(ShadowMask mask, int channel)
+{
+    float shadow = 1.0;
+    if (mask.always || mask.distance) {
+        if (channel >= 0)
+            shadow = mask.shadows[channel];
+    }
+    return shadow;
+}
+
+float GetBakedShadow(ShadowMask mask, int channel, float strength)
+{
+    float shadow = 1.0;
+    if (mask.always || mask.distance)
+        shadow = lerp(1.0, GetBakedShadow(mask, channel), strength);
+    return shadow;
+}
+
+float MixBakedAndRealtimeShadows(CascadeInfo ci, float shadow, int channel, float strength)
+{
+    float baked = GetBakedShadow(ci.shadowMask, channel);
+    if (ci.shadowMask.always)
+    {
+        shadow = lerp(1.0, shadow, ci.strength);
+        shadow = min(baked, shadow);
+        return lerp(1.0, shadow, strength);
+    }
+    if (ci.shadowMask.distance)
+    {
+        shadow = lerp(baked, shadow, ci.strength);
+        return lerp(1.0, shadow, strength);
+    }
+    return lerp(1.0, shadow, strength * ci.strength);
+}
+
+float GetShadowAttenuation(int light, surface sf, CascadeInfo ci)
+{
+    float shadow;
+    ShadowInfo sd = GetShadowData(light, ci);
+    if (sd.strength <= 0.0) {
+        shadow = 1.0;
+    } else {
+        shadow = GetCascadedShadow(sd, ci, sf);
+        shadow = MixBakedAndRealtimeShadows(ci, shadow, sd.shadowMaskChannel, sd.strength);
+    }
+    return shadow;
+}
 
 #endif

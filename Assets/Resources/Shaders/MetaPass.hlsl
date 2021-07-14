@@ -37,7 +37,7 @@ float4 MetaPassFragment(Varyings input) : SV_TARGET
 {
     surface s;
     BRDF brdf;
-    float4 meta;
+    float4 meta = 0.0;
     ZERO_INITIALIZE(surface, s);
     s.color = GetBase(input.baseUV);
     s.metallic = GetMetallic(input.baseUV);

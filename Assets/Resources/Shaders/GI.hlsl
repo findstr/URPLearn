@@ -4,6 +4,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UnityInput.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/EntityLighting.hlsl"
 #include "surface.hlsl"
+#include "Shadows.hlsl"
 
 #if defined(LIGHTMAP_ON)
 
@@ -24,6 +25,7 @@
 struct GI
 {
     float3 diffuse;
+    ShadowMask shadowMask;
 };
 
 float3 SampleLightMap(float2 uv)
@@ -62,10 +64,29 @@ float3 SampleLightProbe(surface s)
 #endif
 }
 
+float4 SampleBakedShadows(float2 lightMapUV)
+{
+#if defined(LIGHTMAP_ON)
+    return SAMPLE_TEXTURE2D(unity_ShadowMask, samplerunity_ShadowMask, lightMapUV);
+#else
+    return unity_ProbesOcclusion;
+#endif
+}
+
 GI GetGI(float2 lightMapUV, surface s)
 {
     GI gi;
     gi.diffuse = SampleLightMap(lightMapUV) + SampleLightProbe(s);
+    gi.shadowMask.distance = false;
+    gi.shadowMask.always = false;
+    gi.shadowMask.shadows = 1.0;
+#if defined(_SHADOW_MASK_ALWAYS)
+    gi.shadowMask.always = true;
+    gi.shadowMask.shadows = SampleBakedShadows(lightMapUV);
+#elif defined(_SHADOW_MASK_DISTANCE)
+    gi.shadowMask.distance = true;
+    gi.shadowMask.shadows = SampleBakedShadows(lightMapUV);
+#endif
     return gi;
 }
 

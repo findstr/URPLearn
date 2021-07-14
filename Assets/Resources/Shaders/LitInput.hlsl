@@ -6,7 +6,9 @@
 
 TEXTURE2D(_BaseMap);
 TEXTURE2D(_EmissionMap);
-SAMPLER(sampler_BaseMap);
+SAMPLER(my_point_clamp_sampler);
+
+#define sampler_BaseMap my_point_clamp_sampler
 
 CBUFFER_START(UnityPerMaterial)
     UNITY_DEFINE_INSTANCED_PROP(float4, _BaseMap_ST)
