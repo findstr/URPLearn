@@ -40,10 +40,10 @@ Shader "LearnURP/Blinphong"
                 float4 TW3: TEXCOORD3;
             };
 
-            CBUFFER_START(UnityPerMaterial)
+            UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
             half4 _Color;
             float4 _MainTex_ST;
-            CBUFFER_END
+            UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
             TEXTURE2D(_MainTex);
             TEXTURE2D(_NormaMap);

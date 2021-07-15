@@ -10,14 +10,14 @@ SAMPLER(my_point_clamp_sampler);
 
 #define sampler_BaseMap my_point_clamp_sampler
 
-CBUFFER_START(UnityPerMaterial)
+UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
     UNITY_DEFINE_INSTANCED_PROP(float4, _BaseMap_ST)
     UNITY_DEFINE_INSTANCED_PROP(float4, _BaseColor)
     UNITY_DEFINE_INSTANCED_PROP(float4, _EmissionColor)
     UNITY_DEFINE_INSTANCED_PROP(float,  _Cutoff)
     UNITY_DEFINE_INSTANCED_PROP(float,  _Metallic)
     UNITY_DEFINE_INSTANCED_PROP(float,  _Smoothness)
-CBUFFER_END
+UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
 float2 TransformBaseUV(float2 baseUV)
 {

@@ -1,4 +1,4 @@
-#ifndef X_META_PASS_INCLUDED
+﻿#ifndef CUSTOM_META_PASS_INCLUDED
 #define X_META_PASS_INCLUDED
 
 #include "surface.hlsl"
