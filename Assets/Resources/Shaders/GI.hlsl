@@ -25,6 +25,7 @@
 struct GI
 {
     float3 diffuse;
+    float3 specular;
     ShadowMask shadowMask;
 };
 
@@ -73,10 +74,19 @@ float4 SampleBakedShadows(float2 lightMapUV)
 #endif
 }
 
-GI GetGI(float2 lightMapUV, surface s)
+float3 SampleEnvironment(surface s, BRDF brdf)
+{
+    float3 uvw = reflect(-s.viewdir, s.normal);
+    float mip = PerceptualRoughnessToMipmapLevel(brdf.perceptualRoughness);
+    float4 env = SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, uvw, mip);
+    return DecodeHDREnvironment(env, unity_SpecCube0_HDR);
+}
+
+GI GetGI(float2 lightMapUV, surface s, BRDF brdf)
 {
     GI gi;
     gi.diffuse = SampleLightMap(lightMapUV) + SampleLightProbe(s);
+    gi.specular = SampleEnvironment(s, brdf);
     gi.shadowMask.distance = false;
     gi.shadowMask.always = false;
     gi.shadowMask.shadows = 1.0;

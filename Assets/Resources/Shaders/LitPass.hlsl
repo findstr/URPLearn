@@ -52,21 +52,18 @@ half4 LitPassFragment (v2f i) : SV_TARGET0
     surface s;
     float4 c = float4(0,0,0,1);
     UNITY_SETUP_INSTANCE_ID(i);
-    ClipLOD(i.positionCS, unity_LODFade.x);
-    /*
-#if defined(LOD_FADE_CROSSFADE)
-    return unity_LODFade.x;
-#endif*/
+    ClipLOD(i.positionCS.xy, unity_LODFade.x);
     s.position = i.positionWS;
     s.color = GetBase(i.uv.xy);
     s.normal = normalize(i.normal);
     s.viewdir = normalize(_WorldSpaceCameraPos - i.positionWS);
     s.metallic = GetMetallic(i.uv);
     s.smoothness = GetSmoothness(i.uv);
+    s.fresnelStrength = GetFresnel(i.uv);
     s.depth = -TransformWorldToView(i.positionWS).z;
     s.dither = InterleavedGradientNoise(i.positionCS.xy, 0);
     BRDF brdf = GetBRDF(s);
-    GI gi = GetGI(GI_FRAGMENT_DATA(i), s);
+    GI gi = GetGI(GI_FRAGMENT_DATA(i), s, brdf);
     c.rgb = GetLighting(s, brdf, gi) + GetEmission(i.uv.xy);
     return c;
 }

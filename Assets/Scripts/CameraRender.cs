@@ -50,10 +50,13 @@ public class CameraRender {
 		var drawingSetting = new DrawingSettings(shaderGBuffer, sortingSettings) {
 			enableDynamicBatching = true,
 			enableInstancing = true,
-			perObjectData = PerObjectData.Lightmaps | PerObjectData.LightProbe | 
+			perObjectData = PerObjectData.Lightmaps | 
+							PerObjectData.LightProbe | 
 							PerObjectData.LightProbeProxyVolume | 
-							PerObjectData.OcclusionProbe 
-							|PerObjectData.ShadowMask
+							PerObjectData.OcclusionProbe | 
+							PerObjectData.ShadowMask |
+							PerObjectData.ReflectionProbes
+
 		};
 		lighting.setup(render_ctx);
 		render_ctx.ctx.DrawRenderers(render_ctx.cull_result, ref drawingSetting, ref filterSetting);

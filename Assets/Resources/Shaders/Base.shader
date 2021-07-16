@@ -9,6 +9,7 @@ Shader "LearnURP/Base"
         _NormaMap("NormalMap", 2D) = "white" {}
         _Metallic("Metallic", Range(0, 1)) = 0
         _Smoothness("Smoothness", Range(0, 1)) = 0.5
+        _Fresnel("Fresnel", Range(0,1)) = 1
     }
     SubShader
     {
