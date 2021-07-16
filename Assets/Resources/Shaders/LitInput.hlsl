@@ -57,7 +57,7 @@ float3 GetEmission(float2 baseUV)
 
 float GetFresnel(float2 baseUV)
 {
-    return 0.0;
+    return UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Fresnel);
 }
 
 #endif

@@ -34,8 +34,8 @@ CBUFFER_START(_CustomShadows)
     float4 _ShadowAtlasSize;
     float4 _CascadeSphere[MAX_CASCADE_COUNT];
     float4 _CascadeData[MAX_CASCADE_COUNT];
-	float4 _DirectionalLightShadowData[MAX_VISIBLE_LIGHT_COUNT];
-    float4x4 _DirectionalShadowMatrices[MAX_VISIBLE_LIGHT_COUNT * MAX_CASCADE_COUNT];
+	float4 _DirectionalLightShadowData[MAX_DIRECTIONAL_LIGHT_COUNT];
+    float4x4 _DirectionalShadowMatrices[MAX_DIRECTIONAL_LIGHT_COUNT * MAX_CASCADE_COUNT];
 
 CBUFFER_END
 

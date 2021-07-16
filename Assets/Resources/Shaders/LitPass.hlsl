@@ -64,7 +64,7 @@ half4 LitPassFragment (v2f i) : SV_TARGET0
     s.dither = InterleavedGradientNoise(i.positionCS.xy, 0);
     BRDF brdf = GetBRDF(s);
     GI gi = GetGI(GI_FRAGMENT_DATA(i), s, brdf);
-    c.rgb = GetLighting(s, brdf, gi) + GetEmission(i.uv.xy);
+    c.rgb = GetLighting(s, brdf, gi);//+GetEmission(i.uv.xy);
     return c;
 }
 

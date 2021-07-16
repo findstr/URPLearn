@@ -10,24 +10,22 @@
 
 CBUFFER_START(_CustomLight)
     int light_directional_count;
-    half4 light_directional_color[MAX_VISIBLE_LIGHT_COUNT];
-    float4 light_directional_direction[MAX_VISIBLE_LIGHT_COUNT];
+    half4 light_directional_color[MAX_DIRECTIONAL_LIGHT_COUNT];
+    float4 light_directional_direction[MAX_DIRECTIONAL_LIGHT_COUNT];
+    
+    int _OtherLightCount;
+    float4 _OtherLightColors[MAX_OTHER_LIGHT_COUNT];
+    float4 _OtherLightPositions[MAX_OTHER_LIGHT_COUNT];
+
 CBUFFER_END
 
 struct light
 {
     float3 color;
     float3 direction;
+	float attenuation;
 };
 
-
-light get_direciontal_light(int idx)
-{
-    light l;
-    l.color = light_directional_color[idx].rgb;
-    l.direction = light_directional_direction[idx].xyz;
-    return l;
-}
 
 float square(float v)
 {
@@ -45,9 +43,9 @@ float specular_strength(surface s, BRDF brdf, light l)
     return r2 / (d2 * max(0.1, lh2)) * norm;
 }
 
-float3 light_radiance(surface s, light l, int light, CascadeInfo ci)
+float3 LightRadiance(surface s, light l)
 {
-    return saturate(dot(s.normal, l.direction)) * l.color * GetShadowAttenuation(light, s, ci);
+	return saturate(dot(s.normal, l.direction)) * l.color * l.attenuation;    
 }
  
 float3 direct_brdf(surface s, BRDF brdf, light l)
@@ -55,10 +53,38 @@ float3 direct_brdf(surface s, BRDF brdf, light l)
     return specular_strength(s, brdf, l) * brdf.specular + brdf.diffuse;
 }
 
-float3 lighting_directional(surface s, BRDF brdf, int i, CascadeInfo ci)
+float3 LightingDirectional(surface s, BRDF brdf, light l)
 {
-    light l = get_direciontal_light(i);
-    return light_radiance(s, l, i, ci) * direct_brdf(s, brdf, l);
+    return LightRadiance(s, l) * direct_brdf(s, brdf, l);
+}
+
+int GetDirectionalLightCount()
+{
+    return light_directional_count;
+}
+
+int GetOtherLightCount()
+{
+    return _OtherLightCount;
+}
+
+light GetDirectionalLight(int idx, surface s, CascadeInfo ci)
+{
+	light l;
+	l.color = light_directional_color[idx].rgb;
+	l.direction = light_directional_direction[idx].xyz;
+	l.attenuation = GetShadowAttenuation(idx, s, ci);
+	return l;
+}
+
+light GetOtherLight(int idx, surface s)
+{
+	light l;
+	l.color = _OtherLightColors[idx].rgb;
+	float3 ray = _OtherLightPositions[idx].xyz - s.position;
+	l.direction = normalize(ray);
+	l.attenuation = 1.0 / max(dot(ray, ray), 0.000001);
+	return l;
 }
 
 float3 GetLighting(surface s, BRDF brdf, GI gi)
@@ -66,10 +92,15 @@ float3 GetLighting(surface s, BRDF brdf, GI gi)
     CascadeInfo ci = GetCascadeInfo(s);
     ci.shadowMask = gi.shadowMask;
     float3 color = IndirectBRDF(s, brdf, gi.diffuse, gi.specular);
-    for (int i = 0; i < light_directional_count; i++) {
-        color += lighting_directional(s, brdf, i, ci);
-    }
-    return color;
+    for (int i = 0; i < GetDirectionalLightCount(); i++) {
+		light l = GetDirectionalLight(i, s, ci);
+		color += LightingDirectional(s, brdf, l);
+	}
+	for (int j = 0; j < GetOtherLightCount(); j++) {
+		light l = GetOtherLight(j, s);
+		color += LightingDirectional(s, brdf, l);
+	}
+	return color;
 }
 
 #endif

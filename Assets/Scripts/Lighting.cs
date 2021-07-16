@@ -4,15 +4,20 @@ using UnityEngine.Rendering;
 
 class Lighting
 {
-	private const int MAX_DIRECTIONAL_LIGHT = Config.MAX_LIGHT_COUNT;
+	private const int MAX_DIRECTIONAL_LIGHT = Config.MAX_DIRECTIONAL_LIGHT_COUNT;
+	private const int MAX_OTHER_LIGHT = Config.MAX_OTHER_LIGHT_COUNT;
 	private int id_light_directional_count;
     private int id_light_directional_color;
     private int id_light_directional_direction;
+	private int _OtherLightCount = Shader.PropertyToID("_OtherLightCount");
+	private int _OtherLightColors = Shader.PropertyToID("_OtherLightColors");
+	private int _OtherLightPositions = Shader.PropertyToID("_OtherLightPositions");
 
-	private int light_directional_count = 0;
 	private Vector4[] light_directional_color		= new Vector4[MAX_DIRECTIONAL_LIGHT];
 	private Vector4[] light_directional_direction	= new Vector4[MAX_DIRECTIONAL_LIGHT];
-	
+	private Vector4[] otherLightColors				= new Vector4[MAX_OTHER_LIGHT];
+	private Vector4[] otherLightPositions			= new Vector4[MAX_OTHER_LIGHT];
+
 	public Lighting()
     {
 		id_light_directional_count = Shader.PropertyToID("light_directional_count");
@@ -20,21 +25,35 @@ class Lighting
 		id_light_directional_direction = Shader.PropertyToID("light_directional_direction");
     }
 
+	private void SetupDirectionalLight(int idx, ref VisibleLight visibleLight)
+    {
+		light_directional_color[idx] = visibleLight.finalColor;
+		light_directional_direction[idx] = -visibleLight.localToWorldMatrix.GetColumn(2);
+    }
+
+	private void SetupPointLight(int idx, ref VisibleLight visibleLight)
+    {
+		otherLightColors[idx] = visibleLight.finalColor;
+		otherLightPositions[idx] = visibleLight.localToWorldMatrix.GetColumn(3);
+    }
+
 	public void setup(RenderContext ctx)
     {
-		light_directional_count = 0;
+		int directLightCount = 0;
+		int otherLightCount = 0;
 		NativeArray<VisibleLight> lights = ctx.cull_result.visibleLights;
 		for (int i = 0; i < lights.Length; i++) {
 			VisibleLight vl = lights[i];
 			switch (vl.lightType) {
 			case LightType.Directional:
-				if (light_directional_count >= MAX_DIRECTIONAL_LIGHT)
-					continue;
-				light_directional_color[light_directional_count] = vl.finalColor;
-				light_directional_direction[light_directional_count] = -vl.localToWorldMatrix.GetColumn(2);
-				++light_directional_count;
+				if (directLightCount < MAX_DIRECTIONAL_LIGHT) { 
+					SetupDirectionalLight(directLightCount++, ref vl);
+				}
 				break;
 			case LightType.Point:
+				if (otherLightCount < MAX_OTHER_LIGHT) {
+					SetupPointLight(otherLightCount++, ref vl);
+				}
 				break;
 			case LightType.Spot:
 				break;
@@ -44,9 +63,16 @@ class Lighting
             }
         }
 		var cb = ctx.command_begin("Lighting");
-		cb.SetGlobalInt(id_light_directional_count, light_directional_count);
-		cb.SetGlobalVectorArray(id_light_directional_color, light_directional_color);
-		cb.SetGlobalVectorArray(id_light_directional_direction, light_directional_direction);
+		cb.SetGlobalInt(id_light_directional_count, directLightCount);
+		if (directLightCount > 0) { 
+            cb.SetGlobalVectorArray(id_light_directional_color, light_directional_color);
+            cb.SetGlobalVectorArray(id_light_directional_direction, light_directional_direction);
+		}
+		cb.SetGlobalInt(_OtherLightCount, otherLightCount);
+		if (otherLightCount > 0) {
+			cb.SetGlobalVectorArray(_OtherLightColors, otherLightColors);
+			cb.SetGlobalVectorArray(_OtherLightPositions, otherLightPositions);
+        }
 		ctx.command_end();
     }
 } 

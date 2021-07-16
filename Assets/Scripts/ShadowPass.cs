@@ -12,7 +12,7 @@ public class ShadowPass
         public float nearPlaneOffset;
     };
 
-	private const int max_shadow_count = Config.MAX_LIGHT_COUNT;
+	private const int max_shadow_count = Config.MAX_DIRECTIONAL_LIGHT_COUNT;
     private const int max_cascade_count = Config.MAX_CASCADE_COUNT;
     private static int shader_prop_shadow_distance = Shader.PropertyToID("_ShadowDistance");
     private static int shader_prop_shadow_atlas_size = Shader.PropertyToID("_ShadowAtlasSize");
