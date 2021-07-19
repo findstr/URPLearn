@@ -4,7 +4,7 @@ Shader "LearnURP/Base"
     {
         _BaseMap("Albedo", 2D) = "white" {}
         _EmissionMap("Emission", 2D) = "white" {}
-        [HDR] _BaseColor("Color", Color) = (1.0, 1.0, 1.0, 1.0)
+        _BaseColor("Color", Color) = (1.0, 1.0, 1.0, 1.0)
         [HDR] _EmissionColor("Emission", Color) = (1.0, 1.0, 1.0, 1.0)
         _NormaMap("NormalMap", 2D) = "white" {}
         _Metallic("Metallic", Range(0, 1)) = 0

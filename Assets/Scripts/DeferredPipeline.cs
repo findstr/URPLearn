@@ -5,12 +5,13 @@ using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class DeferredRenderPipeline : RenderPipeline
+public partial class DeferredRenderPipeline : RenderPipeline
 {
 	private CameraRender camera_render = null;
 	public DeferredRenderPipeline(DeferredRenderPipelineAsset asset) {
 		GraphicsSettings.lightsUseLinearIntensity = true;
 		camera_render = new CameraRender(ref asset.shadows);
+		InitializeForEditor();
 	}
 
 	protected override void Render(ScriptableRenderContext context, Camera[] cameras)
