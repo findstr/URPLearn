@@ -43,22 +43,24 @@ public class CameraRender {
 		shadows.draw(render_ctx);
     }
 
-	private void draw_geometry()
+	private void draw_geometry(bool useDynamicBatching, bool useGPUInstancing, bool useLightsPerObject)
     {
+		PerObjectData lightsPerObjectFlags = useLightsPerObject ? (PerObjectData.LightData | PerObjectData.LightIndices) : PerObjectData.None;
 		var sortingSettings = new SortingSettings(render_ctx.camera);
 		var filterSetting = FilteringSettings.defaultValue;
 		var drawingSetting = new DrawingSettings(shaderGBuffer, sortingSettings) {
-			enableDynamicBatching = true,
-			enableInstancing = true,
+			enableDynamicBatching = useDynamicBatching,
+			enableInstancing = useGPUInstancing,
 			perObjectData = PerObjectData.Lightmaps | 
 							PerObjectData.LightProbe | 
 							PerObjectData.LightProbeProxyVolume | 
 							PerObjectData.OcclusionProbe | 
 							PerObjectData.ShadowMask |
-							PerObjectData.ReflectionProbes
+							PerObjectData.ReflectionProbes |
+							lightsPerObjectFlags
 
 		};
-		lighting.setup(render_ctx);
+		lighting.setup(render_ctx, useLightsPerObject);
 		render_ctx.ctx.DrawRenderers(render_ctx.cull_result, ref drawingSetting, ref filterSetting);
 
 		if (render_ctx.camera.clearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null)
@@ -72,12 +74,12 @@ public class CameraRender {
 #endif
     }
 
-    public void Render(ScriptableRenderContext src, Camera cam)
+    public void Render(ScriptableRenderContext src, Camera cam, bool useDynamicBatch, bool useGPUInstancing, bool useLightPerObject)
     {
 		setup(src, cam);
 		draw_shadow();
 		clear_screen();
-		draw_geometry();
+		draw_geometry(useDynamicBatch, useGPUInstancing, useLightPerObject);
 		cleanup();
     }
 }

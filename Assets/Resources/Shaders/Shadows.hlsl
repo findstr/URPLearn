@@ -37,6 +37,8 @@ CBUFFER_START(_CustomShadows)
 	float4 _DirectionalLightShadowData[MAX_DIRECTIONAL_LIGHT_COUNT];
     float4x4 _DirectionalShadowMatrices[MAX_DIRECTIONAL_LIGHT_COUNT * MAX_CASCADE_COUNT];
 
+    float4 _OtherLightShadowData[MAX_OTHER_LIGHT_COUNT];
+
 CBUFFER_END
 
 struct ShadowMask
@@ -60,6 +62,12 @@ struct ShadowInfo
     int tiledIndex;
     float normaBias;
     int shadowMaskChannel;
+};
+
+struct OtherShadowInfo 
+{
+	float strength;
+	int shadowMaskChannel;
 };
 
 float DistanceSquared(float3 a, float3 b)
@@ -125,6 +133,14 @@ ShadowInfo GetShadowData(int light, CascadeInfo ci)
     sd.normaBias = data.z;
     sd.shadowMaskChannel = data.w;
     return sd;
+}
+
+OtherShadowInfo GetOtherShadowData(int light)
+{
+	OtherShadowInfo osi;
+	osi.strength = _OtherLightShadowData[light].x;
+	osi.shadowMaskChannel = _OtherLightShadowData[light].w;
+	return osi;
 }
 
 float FilterDirectionalShadow(float3 posSM)
@@ -205,5 +221,18 @@ float GetShadowAttenuation(int light, surface sf, CascadeInfo ci)
     }
     return shadow;
 }
+
+float GetOtherShadowAttenuation(OtherShadowInfo other, surface s, CascadeInfo ci)
+{
+	float shadow;
+	if (other.strength <= 0.0) {
+		shadow = 1.0;
+	} else {
+		shadow = GetBakedShadow(ci.shadowMask, other.shadowMaskChannel, other.strength);
+	}
+	return shadow;
+}
+
+
 
 #endif

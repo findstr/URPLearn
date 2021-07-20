@@ -4,11 +4,15 @@ using UnityEngine.Rendering;
 
 class Lighting
 {
+	static string lightsPerObjectKeyword = "_LIGHTS_PER_OBJECT";
+
 	private const int MAX_DIRECTIONAL_LIGHT = Config.MAX_DIRECTIONAL_LIGHT_COUNT;
 	private const int MAX_OTHER_LIGHT = Config.MAX_OTHER_LIGHT_COUNT;
-	private int id_light_directional_count;
-    private int id_light_directional_color;
-    private int id_light_directional_direction;
+
+	private int id_light_directional_count = Shader.PropertyToID("light_directional_count");
+	private int id_light_directional_color = Shader.PropertyToID("light_directional_color");
+	private int id_light_directional_direction = Shader.PropertyToID("light_directional_direction");
+
 	private int _OtherLightCount = Shader.PropertyToID("_OtherLightCount");
 	private int _OtherLightColors = Shader.PropertyToID("_OtherLightColors");
 	private int _OtherLightPositions = Shader.PropertyToID("_OtherLightPositions");
@@ -25,9 +29,7 @@ class Lighting
 
 	public Lighting()
     {
-		id_light_directional_count = Shader.PropertyToID("light_directional_count");
-		id_light_directional_color = Shader.PropertyToID("light_directional_color");
-		id_light_directional_direction = Shader.PropertyToID("light_directional_direction");
+
     }
 
 	private void SetupDirectionalLight(int idx, ref VisibleLight visibleLight)
@@ -58,12 +60,15 @@ class Lighting
 		otherLightDirections[idx] = -visibleLight.localToWorldMatrix.GetColumn(2);
 		otherLightSpotAngles[idx] = new Vector4(angleRangeInv, -outerCos * angleRangeInv);
     }
-	public void setup(RenderContext ctx)
+	public void setup(RenderContext ctx, bool useLightsPerObject)
     {
+		int i;
 		int directLightCount = 0;
 		int otherLightCount = 0;
+		NativeArray<int> indexMap = useLightsPerObject ? ctx.cull_result.GetLightIndexMap(Allocator.Temp) : default;
 		NativeArray<VisibleLight> lights = ctx.cull_result.visibleLights;
-		for (int i = 0; i < lights.Length; i++) {
+		for (i = 0; i < lights.Length; i++) {
+			int newIndex = -1;
 			VisibleLight vl = lights[i];
 			switch (vl.lightType) {
 			case LightType.Directional:
@@ -73,11 +78,13 @@ class Lighting
 				break;
 			case LightType.Point:
 				if (otherLightCount < MAX_OTHER_LIGHT) {
+					newIndex = otherLightCount;
 					SetupPointLight(otherLightCount++, ref vl);
 				}
 				break;
 			case LightType.Spot:
 				if (otherLightCount < MAX_OTHER_LIGHT) {
+					newIndex = otherLightCount;
 					SetupSpotLight(otherLightCount++, ref vl);
 	            }
 				break;
@@ -85,6 +92,17 @@ class Lighting
 				Debug.LogError("DeferredPipeline: not support:" + vl.lightType);
 				break;
             }
+			if (useLightsPerObject)
+				indexMap[i] = newIndex;
+        }
+		if (useLightsPerObject) { 
+            while (i < indexMap.Length)
+                indexMap[i++] = -1;
+			ctx.cull_result.SetLightIndexMap(indexMap);
+			indexMap.Dispose();
+			Shader.EnableKeyword(lightsPerObjectKeyword);
+		} else {
+			Shader.DisableKeyword(lightsPerObjectKeyword);
         }
 		var cb = ctx.command_begin("Lighting");
 		cb.SetGlobalInt(id_light_directional_count, directLightCount);

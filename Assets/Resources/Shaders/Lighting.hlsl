@@ -79,9 +79,12 @@ light GetDirectionalLight(int idx, surface s, CascadeInfo ci)
 	return l;
 }
 
-light GetOtherLight(int idx, surface s)
+light GetOtherLight(int idx, surface s, CascadeInfo ci)
 {
 	light l;
+    
+	OtherShadowInfo osi = GetOtherShadowData(idx);
+    
 	float3 dir = _OtherLightDirections[idx].xyz;
 	float3 ray = _OtherLightPositions[idx].xyz - s.position;
 	float4 spotAngles = _OtherLightSpotAngles[idx];
@@ -93,7 +96,7 @@ light GetOtherLight(int idx, surface s)
     float rangeAttenuation = square(saturate(1.0 - square(distSqr * _OtherLightPositions[idx].w)));
 	float spotAttenuation = square(saturate(dot(dir, l.direction) * spotAngles.x + spotAngles.y));
     
-	l.attenuation = spotAttenuation * rangeAttenuation / distSqr;
+	l.attenuation = spotAttenuation * rangeAttenuation / distSqr * GetOtherShadowAttenuation(osi, s, ci);
 	return l;
 }
 
@@ -106,10 +109,18 @@ float3 GetLighting(surface s, BRDF brdf, GI gi)
 		light l = GetDirectionalLight(i, s, ci);
 		color += LightingDirectional(s, brdf, l);
 	}
+#if defined(_LIGHTS_PER_OBJECT)
+    for (int j = 0; j < min(unity_LightData.y, 8); j++) {
+        int lightIndex = unity_LightIndices[(uint)j/4][(uint)j%4];
+        light l = GetOtherLight(lightIndex, s, ci);
+		color += LightingDirectional(s, brdf, l);
+    }
+#else
 	for (int j = 0; j < GetOtherLightCount(); j++) {
-		light l = GetOtherLight(j, s);
+		light l = GetOtherLight(j, s, ci);
 		color += LightingDirectional(s, brdf, l);
 	}
+#endif
 	return color;
 }
 

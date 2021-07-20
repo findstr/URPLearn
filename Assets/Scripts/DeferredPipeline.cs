@@ -17,6 +17,6 @@ public partial class DeferredRenderPipeline : RenderPipeline
 	protected override void Render(ScriptableRenderContext context, Camera[] cameras)
 	{
 		foreach (var cam in cameras)
-			camera_render.Render(context, cam);
+			camera_render.Render(context, cam, true, true, true);
 	}
 }
