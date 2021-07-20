@@ -62,26 +62,26 @@ public class ShadowPass
     void SetupDirectionalLight(RenderContext ctx, int idx, Light light, int i)
     {
         var cull = ctx.cull_result;
-             if (light.shadows != LightShadows.None && light.shadowStrength > 0f && cull.GetShadowCasterBounds(i, out Bounds b)) {
-                    float maskChannel = -1;
-                    LightBakingOutput lightBaking = light.bakingOutput;
-                    shadow_lights[directShadowCount] = new ShadowLight {
-                        lightIndex = i, 
-                        slopeScaleBias = light.shadowBias, 
-                        nearPlaneOffset = light.shadowNearPlane
-                    };
-                    bool use = (lightBaking.lightmapBakeType == LightmapBakeType.Mixed && lightBaking.mixedLightingMode == MixedLightingMode.Shadowmask);
-                    if (use == true) {
-                        useShadowMask = true;
-                        maskChannel = lightBaking.occlusionMaskChannel;
-                    }
-                    directShadowData[idx] = new Vector4(light.shadowStrength, 
-                        directShadowCount * ctx.shadow_setting.directional.cascadeCount, 
-                        light.shadowNormalBias, maskChannel);
-                    directShadowCount++;
-                } else {
-                    directShadowData[idx] = new Vector4(0, -1, -1);
+        if (light.shadows != LightShadows.None && light.shadowStrength > 0f && cull.GetShadowCasterBounds(i, out Bounds b)) {
+                float maskChannel = -1;
+                LightBakingOutput lightBaking = light.bakingOutput;
+                shadow_lights[directShadowCount] = new ShadowLight {
+                    lightIndex = i, 
+                    slopeScaleBias = light.shadowBias, 
+                    nearPlaneOffset = light.shadowNearPlane
+                };
+                bool use = (lightBaking.lightmapBakeType == LightmapBakeType.Mixed && lightBaking.mixedLightingMode == MixedLightingMode.Shadowmask);
+                if (use == true) {
+                    useShadowMask = true;
+                    maskChannel = lightBaking.occlusionMaskChannel;
                 }
+                directShadowData[idx] = new Vector4(light.shadowStrength, 
+                    directShadowCount * ctx.shadow_setting.directional.cascadeCount, 
+                    light.shadowNormalBias, maskChannel);
+                directShadowCount++;
+        } else {
+            directShadowData[idx] = new Vector4(0, -1, -1);
+        }
     }
 
     void SetupOtherLight(int idx, Light light)
@@ -111,7 +111,7 @@ public class ShadowPass
 			switch (vl.lightType) {
 			case LightType.Directional:
                 if (directIdx < Config.MAX_DIRECTIONAL_LIGHT_COUNT) 
-                    SetupDirectionalLight(ctx, ++directIdx, light, i);
+                    SetupDirectionalLight(ctx, directIdx++, light, i);
                 break;
             case LightType.Point:
             case LightType.Spot:
