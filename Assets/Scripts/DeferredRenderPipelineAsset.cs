@@ -31,6 +31,11 @@ public class ShadowSetting {
         public float cascadeFade;
         public Vector3 cascadeRatios => new Vector3(cascadeRatio1, cascadeRatio2, cascadeRatio3);
 	};
+    [System.Serializable]
+    public struct Other {
+        public TextureSize atlasSize;
+        public FilterMode filter;
+    };
     [Min(0f)]
     public float maxDistance = 100f;
     [Min(0.001f)]
@@ -44,6 +49,10 @@ public class ShadowSetting {
         cascadeRatio2 = 0.25f,
         cascadeRatio3 = 0.5f,
         cascadeFade = 0.1f,
+    };
+    public Other other = new Other {
+        atlasSize = TextureSize._1024,
+        filter = FilterMode.PCF2x2,
     };
 }
 

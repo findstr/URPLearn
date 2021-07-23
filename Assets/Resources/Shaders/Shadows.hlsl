@@ -21,9 +21,20 @@
     #define DIRECTIONAL_FILTER_SETUP    SampleShadow_ComputeSamples_Tent_7x7
 #endif
 
-#define MAX_SHADOW_COUNT	4
+#if defined(_OTHER_PCF3)
+    #define OTHER_FILTER_SAMPLES        4
+    #define OTHER_FILTER_SETUP          SampleShadow_ComputeSamples_Tent_3x3
+#elif defined(_OTHER_PCF5)
+    #define OTHER_FILTER_SAMPLES        9
+    #define OTHER_FILTER_SETUP          SampleShadow_ComputeSamples_Tent_5x5
+#elif defined(_OTHER_PCF7)
+    #define OTHER_FILTER_SAMPLES        16
+    #define OTHER_FILTER_SETUP          SampleShadow_ComputeSamples_Tent_7x7
+#endif
+
 
 TEXTURE2D_SHADOW(_DirectionalShadowAtlas);
+TEXTURE2D_SHADOW(_OtherShadowAtlas);
 #define SHADOW_SAMPLER sampler_linear_clamp_compare
 SAMPLER_CMP(SHADOW_SAMPLER);
 
@@ -37,7 +48,9 @@ CBUFFER_START(_CustomShadows)
 	float4 _DirectionalLightShadowData[MAX_DIRECTIONAL_LIGHT_COUNT];
     float4x4 _DirectionalShadowMatrices[MAX_DIRECTIONAL_LIGHT_COUNT * MAX_CASCADE_COUNT];
 
-    float4 _OtherLightShadowData[MAX_OTHER_LIGHT_COUNT];
+    float4x4 _OtherShadowMatrices[MAX_OTHER_LIGHT_COUNT];
+    float4 _OtherShadowData[MAX_OTHER_LIGHT_COUNT];
+    float4 _OtherShadowTiles[MAX_OTHER_LIGHT_COUNT];
 
 CBUFFER_END
 
@@ -67,7 +80,12 @@ struct ShadowInfo
 struct OtherShadowInfo 
 {
 	float strength;
+	int tiledIndex;
+	bool isPoint;
 	int shadowMaskChannel;
+	float3 lightPositionWS;
+	float3 lightDirectionWS;
+	float3 spotDirectionWS;
 };
 
 float DistanceSquared(float3 a, float3 b)
@@ -138,8 +156,13 @@ ShadowInfo GetShadowData(int light, CascadeInfo ci)
 OtherShadowInfo GetOtherShadowData(int light)
 {
 	OtherShadowInfo osi;
-	osi.strength = _OtherLightShadowData[light].x;
-	osi.shadowMaskChannel = _OtherLightShadowData[light].w;
+	osi.strength = _OtherShadowData[light].x;
+	osi.tiledIndex = _OtherShadowData[light].y;
+	osi.isPoint = _OtherShadowData[light].z;
+	osi.shadowMaskChannel = _OtherShadowData[light].w;
+	osi.lightPositionWS = 0.0;
+	osi.lightDirectionWS = 0.0;
+	osi.spotDirectionWS = 0.0;
 	return osi;
 }
 
@@ -161,6 +184,29 @@ float FilterDirectionalShadow(float3 posSM)
 #endif
 }
 
+float SampleOtherShadowAtlas(float3 posSM, float3 bounds)
+{
+	posSM.xy = clamp(posSM.xy, bounds.xy, bounds.xy + bounds.z);
+	return SAMPLE_TEXTURE2D_SHADOW(_OtherShadowAtlas, SHADOW_SAMPLER, posSM);
+}
+
+float FilterOtherShadow(float3 posSM, float3 bounds)
+{
+#if defined(OTHER_FILTER_SETUP)
+    float  weights[OTHER_FILTER_SAMPLES];
+    float2 positions[OTHER_FILTER_SAMPLES];
+    float4 size = _ShadowAtlasSize.wwzz;
+    OTHER_FILTER_SETUP(_ShadowAtlasSize, posSM.xy, weights, positions);
+    float shadow = 0;
+    for (int i = 0; i < OTHER_FILTER_SAMPLES; i++) {
+        shadow += weights[i] * SampleOtherShadowAtlas(float3(positions[i].xy, posSM.z));
+    }
+    return shadow;
+#else
+	return SampleOtherShadowAtlas(posSM, bounds);
+#endif
+}
+
 float GetCascadedShadow(ShadowInfo sd, CascadeInfo ci, surface sf)
 {
     float3 normalBias = sf.normal * (sd.normaBias * _CascadeData[ci.cascadeIndex].y);
@@ -172,6 +218,32 @@ float GetCascadedShadow(ShadowInfo sd, CascadeInfo ci, surface sf)
         shadow = lerp(FilterDirectionalShadow(posSM), shadow, ci.blend);
     }
     return shadow;
+}
+
+static const float3 pointShadowPlanes[6] = {
+	float3(-1.0, 0.0, 0.0),
+	float3(1.0, 0.0, 0.0),
+	float3(0.0, -1.0, 0.0),
+	float3(0.0, 1.0, 0.0),
+	float3(0.0, 0.0, -1.0),
+	float3(0.0, 0.0, 1.0)
+};
+
+float GetOtherShadow(OtherShadowInfo other, surface s, CascadeInfo ci)
+{
+	float tileIndex = other.tiledIndex;
+	float3 lightPlane = other.spotDirectionWS;
+	if (other.isPoint) {
+		float faceOffset = CubeMapFaceID(-other.lightDirectionWS);
+		tileIndex += faceOffset;
+		lightPlane = pointShadowPlanes[faceOffset];
+	}
+	float4 tileData = _OtherShadowTiles[tileIndex];
+	float3 surfaceToLight = other.lightPositionWS - s.position;
+	float distanceToLightPlane = dot(surfaceToLight, lightPlane);
+	float3 normalBias = s.normal * tileData.w * distanceToLightPlane;
+	float4 posSM = mul(_OtherShadowMatrices[tileIndex], float4(s.position + normalBias, 1.0));
+	return FilterOtherShadow(posSM.xyz/posSM.w, tileData.xyz);
 }
 
 float GetBakedShadow(ShadowMask mask, int channel)
@@ -225,11 +297,13 @@ float GetShadowAttenuation(int light, surface sf, CascadeInfo ci)
 float GetOtherShadowAttenuation(OtherShadowInfo other, surface s, CascadeInfo ci)
 {
 	float shadow;
-	if (other.strength <= 0.0) {
-		shadow = 1.0;
-	} else {
-		shadow = GetBakedShadow(ci.shadowMask, other.shadowMaskChannel, other.strength);
-	}
+	//if (other.strength * ci.strength <= 0.0) {
+//		shadow = GetBakedShadow(ci.shadowMask, other.shadowMaskChannel, abs(other.strength));
+//	} else {
+		shadow = GetOtherShadow(other, s, ci);
+		//shadow = MixBakedAndRealtimeShadows(ci, shadow, other.shadowMaskChannel, other.strength);
+		//shadow = GetBakedShadow(ci.shadowMask, other.shadowMaskChannel, abs(other.strength));
+//	}
 	return shadow;
 }
 

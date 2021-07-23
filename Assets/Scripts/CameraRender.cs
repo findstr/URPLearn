@@ -7,12 +7,12 @@ using UnityEngine.Rendering;
 public class CameraRender {
 	private ShadowPass shadows = new ShadowPass();
 	private Lighting lighting = new Lighting();
-	private RenderContext render_ctx = new RenderContext();
+	private RenderData render_ctx = new RenderData();
 	private ShaderTagId shaderGBuffer = new ShaderTagId("GBuffer");
 
 	public CameraRender(ref ShadowSetting ss)
 	{ 
-		render_ctx.shadow_setting = ss;
+		render_ctx.shadowSettings = ss;
 	}
 
 	private void setup(ScriptableRenderContext src, Camera cam)
@@ -20,8 +20,8 @@ public class CameraRender {
 		render_ctx.ctx = src;
 		render_ctx.camera = cam;
 		if (render_ctx.camera.TryGetCullingParameters(out var p)) {
-			p.shadowDistance = Mathf.Min(render_ctx.shadow_setting.maxDistance, cam.farClipPlane);
-			render_ctx.cull_result = render_ctx.ctx.Cull(ref p);
+			p.shadowDistance = Mathf.Min(render_ctx.shadowSettings.maxDistance, cam.farClipPlane);
+			render_ctx.cullResults = render_ctx.ctx.Cull(ref p);
 		}
     }
 
@@ -40,7 +40,7 @@ public class CameraRender {
 
 	private void draw_shadow()
     {
-		shadows.draw(render_ctx);
+		shadows.Render(render_ctx);
     }
 
 	private void draw_geometry(bool useDynamicBatching, bool useGPUInstancing, bool useLightsPerObject)
@@ -61,7 +61,7 @@ public class CameraRender {
 
 		};
 		lighting.setup(render_ctx, useLightsPerObject);
-		render_ctx.ctx.DrawRenderers(render_ctx.cull_result, ref drawingSetting, ref filterSetting);
+		render_ctx.ctx.DrawRenderers(render_ctx.cullResults, ref drawingSetting, ref filterSetting);
 
 		if (render_ctx.camera.clearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null)
 			render_ctx.ctx.DrawSkybox(render_ctx.camera);

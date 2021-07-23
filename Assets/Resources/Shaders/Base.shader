@@ -60,6 +60,7 @@ Shader "LearnURP/Base"
             Cull off
             
             HLSLPROGRAM
+            #pragma enable_d3d11_debug_symbols
             #pragma target 3.5
             #pragma vertex      MetaPassVertex
             #pragma fragment    MetaPassFragment

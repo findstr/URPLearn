@@ -60,13 +60,13 @@ class Lighting
 		otherLightDirections[idx] = -visibleLight.localToWorldMatrix.GetColumn(2);
 		otherLightSpotAngles[idx] = new Vector4(angleRangeInv, -outerCos * angleRangeInv);
     }
-	public void setup(RenderContext ctx, bool useLightsPerObject)
+	public void setup(RenderData ctx, bool useLightsPerObject)
     {
 		int i;
 		int directLightCount = 0;
 		int otherLightCount = 0;
-		NativeArray<int> indexMap = useLightsPerObject ? ctx.cull_result.GetLightIndexMap(Allocator.Temp) : default;
-		NativeArray<VisibleLight> lights = ctx.cull_result.visibleLights;
+		NativeArray<int> indexMap = useLightsPerObject ? ctx.cullResults.GetLightIndexMap(Allocator.Temp) : default;
+		NativeArray<VisibleLight> lights = ctx.cullResults.visibleLights;
 		for (i = 0; i < lights.Length; i++) {
 			int newIndex = -1;
 			VisibleLight vl = lights[i];
@@ -98,7 +98,7 @@ class Lighting
 		if (useLightsPerObject) { 
             while (i < indexMap.Length)
                 indexMap[i++] = -1;
-			ctx.cull_result.SetLightIndexMap(indexMap);
+			ctx.cullResults.SetLightIndexMap(indexMap);
 			indexMap.Dispose();
 			Shader.EnableKeyword(lightsPerObjectKeyword);
 		} else {

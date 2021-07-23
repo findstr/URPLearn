@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class RenderContext {
+public class RenderData {
     public Camera camera;
     public ScriptableRenderContext ctx;
-    public CullingResults cull_result;
-	public ShadowSetting shadow_setting;
+    public CullingResults cullResults;
+	public ShadowSetting shadowSettings;
     private CommandBuffer command = new CommandBuffer();
     public CommandBuffer command_begin(string name)
     {

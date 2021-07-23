@@ -83,19 +83,23 @@ light GetOtherLight(int idx, surface s, CascadeInfo ci)
 {
 	light l;
     
-	OtherShadowInfo osi = GetOtherShadowData(idx);
     
 	float3 dir = _OtherLightDirections[idx].xyz;
-	float3 ray = _OtherLightPositions[idx].xyz - s.position;
+	float3 position = _OtherLightPositions[idx].xyz;
+	float3 ray = position - s.position;
 	float4 spotAngles = _OtherLightSpotAngles[idx];
 	l.color = _OtherLightColors[idx].rgb;
 	l.direction = normalize(ray);
-    
-    
+       
     float distSqr = max(dot(ray, ray), 0.000001);
     float rangeAttenuation = square(saturate(1.0 - square(distSqr * _OtherLightPositions[idx].w)));
 	float spotAttenuation = square(saturate(dot(dir, l.direction) * spotAngles.x + spotAngles.y));
     
+    OtherShadowInfo osi = GetOtherShadowData(idx);
+	osi.lightPositionWS = position;
+	osi.lightDirectionWS = l.direction;
+	osi.spotDirectionWS = dir;
+ 
 	l.attenuation = spotAttenuation * rangeAttenuation / distSqr * GetOtherShadowAttenuation(osi, s, ci);
 	return l;
 }
